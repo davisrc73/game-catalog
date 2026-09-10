@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Catálogo de Jogos{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <div>
+    <h1>A tua biblioteca</h1>
+    <p class="muted">Organizada por consola e sincronizada com o NAS.</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>{{ stats.total }}</b><span>jogos</span></div>
+    <div class="stat"><b>{{ stats.consoles }}</b><span>consolas</span></div>
+    <div class="stat"><b>{{ stats.with_cover }}</b><span>com capa</span></div>
+  </div>
+</section>
+
+{% if last_scan %}
+<p class="scaninfo muted">
+  Último scan: {{ last_scan.started_at }} —
+  +{{ last_scan.added }} novos, ~{{ last_scan.updated }} atualizados, −{{ last_scan.removed }} removidos
+  ({{ last_scan.status }})
+</p>
+{% endif %}
+
+{% if consoles %}
+<div class="console-grid">
+  {% for c in consoles %}
+  <a class="console-card" href="{{ url_for('console_view', console=c.console) }}" style="--accent: {{ c.accent }}">
+    <span class="console-badge">
+      {% if c.logo %}
+        <img src="{{ url_for('logo', console=c.console) }}" alt="{{ c.console }}">
+      {% else %}
+        <span class="console-initials">{{ c.initials }}</span>
+      {% endif %}
+    </span>
+    <span class="console-info">
+      <span class="console-name">{{ c.console }}</span>
+      <span class="console-count">{{ c.total }} jogo{{ 's' if c.total != 1 else '' }}</span>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>Ainda não há jogos no catálogo.</p>
+  <p class="muted">Carrega em <b>Fazer scan</b> para analisar as pastas do NAS.</p>
+</div>
+{% endif %}
+
+{% endblock %}

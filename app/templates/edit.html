@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Editar · {{ game.title }}{% endblock %}
+{% block content %}
+
+<nav class="crumbs">
+  <a href="{{ url_for('index') }}">Catálogo</a> /
+  <a href="{{ url_for('game_view', game_id=game.id) }}">{{ game.title }}</a> /
+  <span>Editar</span>
+</nav>
+
+<form class="form" method="post" action="{{ url_for('game_edit', game_id=game.id) }}">
+  <h1>Editar metadados</h1>
+
+  <label>Título
+    <input type="text" name="title" value="{{ game.title }}" required>
+  </label>
+
+  <div class="row">
+    <label>Consola
+      <input type="text" name="console" value="{{ game.console }}">
+    </label>
+    <label>Ano
+      <input type="number" name="year" min="1970" max="2100" value="{{ game.year or '' }}">
+    </label>
+  </div>
+
+  <label>Género
+    <input type="text" name="genre" value="{{ game.genre or '' }}">
+  </label>
+
+  <label>Descrição
+    <textarea name="description" rows="4">{{ game.description or '' }}</textarea>
+  </label>
+
+  <label>Substituir capa (URL da imagem)
+    <input type="url" name="cover_url" placeholder="https://…/capa.jpg">
+    <small class="muted">Deixa em branco para manter a capa atual. A capa definida aqui fica fixa e não é substituída no scan.</small>
+  </label>
+
+  <div class="actions">
+    <button class="btn" type="submit">Guardar</button>
+    <a class="btn ghost" href="{{ url_for('game_view', game_id=game.id) }}">Cancelar</a>
+  </div>
+</form>
+
+<form class="form danger-zone" method="post" action="{{ url_for('game_delete', game_id=game.id) }}"
+      onsubmit="return confirm('Remover “{{ game.title }}” do catálogo?\n\nO ficheiro no NAS NÃO é apagado. Nota: se a pasta de origem continuar a ser analisada, o jogo volta a aparecer no próximo scan.');">
+  <button class="btn danger" type="submit">Remover do catálogo</button>
+  <small class="muted">Remove apenas a entrada e a capa. Não apaga o ficheiro no NAS.</small>
+</form>
+
+{% endblock %}

@@ -1,0 +1,35 @@
+services:
+  game-catalog:
+    build: .
+    container_name: game-catalog
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      # Chave opcional para descarregar capas (https://www.steamgriddb.com)
+      STEAMGRIDDB_API_KEY: "${STEAMGRIDDB_API_KEY:-}"
+      # Metadados (ano, género, descrição) via IGDB. Credenciais criadas em
+      # https://dev.twitch.tv/console/apps
+      TWITCH_CLIENT_ID: "${TWITCH_CLIENT_ID:-}"
+      TWITCH_CLIENT_SECRET: "${TWITCH_CLIENT_SECRET:-}"
+
+      # --- OPÇÃO B (alternativa): mapeamento explícito consola=caminho ---
+      # Útil se preferires não normalizar os nomes via montagem. Se usares isto,
+      # monta cada origem num caminho qualquer (ex: /games/switch) e refere-o aqui.
+      # Tem prioridade sobre GAMES_ROOT. Um par por linha.
+      # GAME_SOURCES: |
+      #   Nintendo Switch=/games/switch
+      #   Xbox 360=/games/xbox360
+      #   PS2=/games/ps2
+
+    volumes:
+      # --- OPÇÃO A (recomendada): montar cada origem como /games/<Consola> ---
+      # O último segmento do caminho do contentor é o nome mostrado no portal,
+      # por isso podes "limpar" nomes feios dos USB shares aqui mesmo.
+      - "/volumeUSB6/usbshare/SWITCH GAMES:/games/Nintendo Switch:ro"
+      - "/volumeUSB3/usbshare/XBOX 360 (GAMES):/games/Xbox 360:ro"
+      # acrescenta as restantes consolas:
+      # - "/volumeUSB1/usbshare/PS2 ISOs:/games/PS2:ro"
+
+      # Dados persistentes (base de dados + capas) no NAS:
+      - /volume1/docker/game-catalog/data:/data

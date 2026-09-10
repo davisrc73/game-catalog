@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Catálogo de Jogos{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="brand-mark">▚</span> Catálogo<span class="brand-dim">/NAS</span>
+    </a>
+    <form class="search" action="{{ url_for('console_view', console=request.view_args.get('console','')) if request.view_args and request.view_args.get('console') else '#' }}" method="get" onsubmit="return doSearch(event)">
+      <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo…" value="{{ request.args.get('q','') }}">
+    </form>
+    <button id="scanBtn" class="btn-scan" onclick="startScan()">
+      <span class="dot"></span> Fazer scan
+    </button>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    Catálogo de Jogos · armazenado em <code>{{ config_root }}</code>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

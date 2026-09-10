@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+venv/
+data/
+.env
+*.log
+.DS_Store
+Thumbs.db
+.git
+.gitignore
+.vscode/
+.idea/
+README.md
+MANUAL_SYNOLOGY.md

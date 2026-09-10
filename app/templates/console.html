@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ console }} · Catálogo{% endblock %}
+{% block content %}
+
+<nav class="crumbs">
+  <a href="{{ url_for('index') }}">Catálogo</a> / <span>{{ console }}</span>
+</nav>
+
+<div class="page-head">
+  <h1>{{ console }}</h1>
+  <span class="muted">{{ games|length }} jogo{{ 's' if games|length != 1 else '' }}</span>
+  <div class="head-actions">
+    <form method="post" action="{{ url_for('console_logo_upload', console=console) }}"
+          enctype="multipart/form-data" onchange="this.submit()">
+      <label class="btn ghost small" title="Carregar uma imagem como logótipo desta consola">
+        Logótipo…
+        <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg" hidden>
+      </label>
+    </form>
+    <form method="post" action="{{ url_for('console_delete', console=console) }}"
+          onsubmit="return confirm('Eliminar a consola “{{ console }}” e os seus {{ games|length }} jogo(s) do CATÁLOGO?\n\nOs ficheiros no NAS NÃO são apagados.');">
+      <button class="btn danger small" type="submit">Eliminar consola</button>
+    </form>
+  </div>
+</div>
+
+{% if games %}
+<div class="game-grid">
+  {% for g in games %}
+  <a class="game-card" href="{{ url_for('game_view', game_id=g.id) }}">
+    <div class="cover">
+      {% if g.cover %}
+        <img loading="lazy" src="{{ url_for('cover', filename=g.cover) }}" alt="{{ g.title }}">
+      {% else %}
+        <div class="cover-placeholder"><span>{{ g.title[0]|upper }}</span></div>
+      {% endif %}
+    </div>
+    <div class="game-meta">
+      <span class="game-title">{{ g.title }}</span>
+      {% if g.year %}<span class="game-year">{{ g.year }}</span>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty"><p>Nenhum jogo encontrado{% if search %} para “{{ search }}”{% endif %}.</p></div>
+{% endif %}
+
+{% endblock %}
