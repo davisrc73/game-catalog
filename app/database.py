@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS games (
     description TEXT,
     size_bytes  INTEGER DEFAULT 0,
     cover_locked INTEGER DEFAULT 0,       -- 1 = capa definida à mão, o scan não substitui
+    favorite    INTEGER DEFAULT 0,       -- 1 = jogo marcado como favorito
     created_at  TEXT DEFAULT (datetime('now')),
     updated_at  TEXT DEFAULT (datetime('now'))
 );
@@ -55,6 +56,10 @@ def init_db() -> None:
     os.makedirs(config.LOGOS_DIR, exist_ok=True)
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(games)").fetchall()]
+        if "favorite" not in cols:
+            conn.execute("ALTER TABLE games ADD COLUMN favorite INTEGER DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_games_fav ON games(favorite);")
 
 
 @contextmanager

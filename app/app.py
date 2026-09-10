@@ -25,11 +25,13 @@ def inject_globals():
 @app.route("/")
 def index():
     search = request.args.get("q", "").strip() or request.args.get("search", "").strip()
-    if search:
-        games = models.list_games(console=None, search=search)
+    favorites = request.args.get("favorites") == "1"
+    if search or favorites:
+        games = models.list_games(console=None, search=search, favorites_only=favorites)
         return render_template(
             "index.html",
             search=search,
+            favorites=favorites,
             games=games,
             stats=models.stats(),
             last_scan=models.last_scan(),
@@ -51,6 +53,7 @@ def index():
         stats=models.stats(),
         last_scan=models.last_scan(),
         scanning=scanner.is_scanning(),
+        favorites=False,
     )
 
 
@@ -58,6 +61,24 @@ def index():
 def search_view():
     query = request.args.get("q", "").strip()
     return redirect(url_for("index", q=query))
+
+
+@app.route("/random")
+def random_game():
+    fav = request.args.get("favorites") == "1"
+    g = models.get_random_game(console=None, favorites_only=fav)
+    if not g:
+        return redirect(url_for("index"))
+    return redirect(url_for("game_view", game_id=g["id"]))
+
+
+@app.route("/console/<console>/random")
+def random_console_game(console):
+    fav = request.args.get("favorites") == "1"
+    g = models.get_random_game(console=console, favorites_only=fav)
+    if not g:
+        return redirect(url_for("console_view", console=console))
+    return redirect(url_for("game_view", game_id=g["id"]))
 
 
 @app.route("/api/search")
@@ -82,8 +103,15 @@ def api_search():
 @app.route("/console/<console>")
 def console_view(console):
     search = request.args.get("q", "").strip() or None
-    games = models.list_games(console=console, search=search)
-    return render_template("console.html", console=console, games=games, search=search or "")
+    favorites = request.args.get("favorites") == "1"
+    games = models.list_games(console=console, search=search, favorites_only=favorites)
+    return render_template(
+        "console.html",
+        console=console,
+        games=games,
+        search=search or "",
+        favorites=favorites,
+    )
 
 
 @app.route("/game/<game_id>")
@@ -110,10 +138,20 @@ def game_edit(game_id):
         fields["year"] = int(year) if year.isdigit() else None
         models.update_game(game_id, fields)
 
-        # Substituição opcional da capa por URL
+        # 1. Substituição opcional por upload direto de ficheiro
+        cover_file = request.files.get("cover_file")
+        if cover_file and cover_file.filename:
+            raw_ext = os.path.splitext(cover_file.filename)[1].lower()
+            if raw_ext in (".png", ".jpg", ".jpeg", ".webp"):
+                filename = f"{game_id}{raw_ext}"
+                cover_file.save(os.path.join(config.THUMBS_DIR, filename))
+                models.update_game(game_id, {"cover": filename, "cover_locked": 1})
+
+        # 2. Substituição alternativa por URL
         cover_url = request.form.get("cover_url", "").strip()
-        if cover_url:
+        if cover_url and not (cover_file and cover_file.filename):
             _save_cover_from_url(game_id, cover_url)
+
         return redirect(url_for("game_view", game_id=game_id))
     return render_template("edit.html", game=game)
 
@@ -218,6 +256,12 @@ def api_status():
         "stats": models.stats(),
         "last_scan": models.last_scan(),
     })
+
+
+@app.route("/api/game/<game_id>/favorite", methods=["POST"])
+def api_toggle_favorite(game_id):
+    is_fav = models.toggle_favorite(game_id)
+    return jsonify({"success": True, "favorite": is_fav})
 
 
 if __name__ == "__main__":

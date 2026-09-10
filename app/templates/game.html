@@ -18,7 +18,10 @@
   </div>
 
   <div class="detail-body">
-    <h1>{{ game.title }}</h1>
+    <h1>
+      {{ game.title }}
+      {% if game.favorite %}<span class="fav-badge" title="Jogo favorito">⭐</span>{% endif %}
+    </h1>
     <div class="tags">
       <span class="tag">{{ game.console }}</span>
       {% if game.year %}<span class="tag">{{ game.year }}</span>{% endif %}
@@ -37,7 +40,13 @@
       <dt>ID</dt><dd><code>{{ game.id }}</code></dd>
     </dl>
 
-    <a class="btn" href="{{ url_for('game_edit', game_id=game.id) }}">Editar metadados</a>
+    <div class="detail-actions">
+      <button type="button" class="btn fav-action-btn {% if game.favorite %}active{% endif %}" onclick="toggleFavorite('{{ game.id }}', this, event)">
+        <span class="star-icon">★</span>
+        <span class="btn-text">{% if game.favorite %}Favorito{% else %}Marcar Favorito{% endif %}</span>
+      </button>
+      <a class="btn ghost" href="{{ url_for('game_edit', game_id=game.id) }}">Editar metadados</a>
+    </div>
   </div>
 </article>
 

@@ -16,13 +16,19 @@ def list_consoles() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def list_games(console: Optional[str] = None, search: Optional[str] = None) -> list[dict]:
-    """Lista jogos com suporte a filtro por consola e pesquisa multi-termo insensível a acentos."""
+def list_games(
+    console: Optional[str] = None,
+    search: Optional[str] = None,
+    favorites_only: bool = False,
+) -> list[dict]:
+    """Lista jogos com suporte a filtro por consola, favoritos e pesquisa multi-termo insensível a acentos."""
     sql = "SELECT * FROM games WHERE 1=1"
     params: list = []
     if console:
         sql += " AND console = ?"
         params.append(console)
+    if favorites_only:
+        sql += " AND favorite = 1"
     if search:
         # Divide a pesquisa em palavras para que múltiplos termos coincidam
         # (ex: 'mario switch' encontra Mario na Switch, 'zelda breath' encontra Zelda)
@@ -52,9 +58,38 @@ def get_game(game_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
+def toggle_favorite(game_id: str) -> bool:
+    """Alterna o estado de favorito de um jogo e devolve o novo estado (True/False)."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT favorite FROM games WHERE id = ?", (game_id,)).fetchone()
+        if not row:
+            return False
+        new_val = 0 if row["favorite"] else 1
+        conn.execute(
+            "UPDATE games SET favorite = ?, updated_at = datetime('now') WHERE id = ?",
+            (new_val, game_id),
+        )
+        return bool(new_val)
+
+
+def get_random_game(console: Optional[str] = None, favorites_only: bool = False) -> Optional[dict]:
+    """Devolve um jogo aleatório da biblioteca (ou de uma consola específica)."""
+    sql = "SELECT * FROM games WHERE 1=1"
+    params: list = []
+    if console:
+        sql += " AND console = ?"
+        params.append(console)
+    if favorites_only:
+        sql += " AND favorite = 1"
+    sql += " ORDER BY RANDOM() LIMIT 1"
+    with get_conn() as conn:
+        row = conn.execute(sql, params).fetchone()
+    return dict(row) if row else None
+
+
 def update_game(game_id: str, fields: dict) -> None:
     """Atualiza campos editáveis manualmente."""
-    allowed = {"title", "console", "year", "genre", "description", "cover", "cover_locked"}
+    allowed = {"title", "console", "year", "genre", "description", "cover", "cover_locked", "favorite"}
     sets, params = [], []
     for k, v in fields.items():
         if k in allowed:
@@ -121,4 +156,7 @@ def stats() -> dict:
         with_cover = conn.execute(
             "SELECT COUNT(*) FROM games WHERE cover IS NOT NULL AND cover != ''"
         ).fetchone()[0]
-    return {"total": total, "consoles": consoles, "with_cover": with_cover}
+        favorites = conn.execute(
+            "SELECT COUNT(*) FROM games WHERE favorite = 1"
+        ).fetchone()[0]
+    return {"total": total, "consoles": consoles, "with_cover": with_cover, "favorites": favorites}

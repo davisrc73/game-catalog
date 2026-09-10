@@ -1,15 +1,21 @@
 {% extends "base.html" %}
-{% block title %}{{ console }} · Catálogo{% endblock %}
+{% block title %}{% if favorites %}⭐ Favoritos · {% endif %}{{ console }} · Catálogo{% endblock %}
 {% block content %}
 
 <nav class="crumbs">
   <a href="{{ url_for('index') }}">Catálogo</a> / <span>{{ console }}</span>
+  {% if favorites %} / <span>Favoritos</span>{% endif %}
 </nav>
 
 <div class="page-head">
-  <h1>{{ console }}</h1>
-  <span class="muted">{{ games|length }} jogo{{ 's' if games|length != 1 else '' }}</span>
+  <div>
+    <h1>{{ console }}</h1>
+    <span class="muted">{{ games|length }} jogo{{ 's' if games|length != 1 else '' }}{% if favorites %} nos favoritos{% endif %}{% if search %} para “{{ search }}”{% endif %}</span>
+  </div>
   <div class="head-actions">
+    {% if games %}
+      <a class="btn ghost small" href="{{ url_for('random_console_game', console=console, favorites=1 if favorites else None) }}" title="Sortear um jogo aleatório desta consola">🎲 Aleatório</a>
+    {% endif %}
     <form method="post" action="{{ url_for('console_logo_upload', console=console) }}"
           enctype="multipart/form-data" onchange="this.submit()">
       <label class="btn ghost small" title="Carregar uma imagem como logótipo desta consola">
@@ -24,6 +30,11 @@
   </div>
 </div>
 
+<div class="filter-tabs">
+  <a class="filter-tab {% if not favorites %}active{% endif %}" href="{{ url_for('console_view', console=console, q=search or None) }}">Todos os jogos</a>
+  <a class="filter-tab {% if favorites %}active{% endif %}" href="{{ url_for('console_view', console=console, favorites=1, q=search or None) }}">⭐ Favoritos</a>
+</div>
+
 {% if games %}
 <div class="game-grid">
   {% for g in games %}
@@ -34,6 +45,7 @@
       {% else %}
         <div class="cover-placeholder"><span>{{ g.title[0]|upper }}</span></div>
       {% endif %}
+      <button type="button" class="fav-btn {% if g.favorite %}active{% endif %}" title="{% if g.favorite %}Remover dos favoritos{% else %}Marcar como favorito{% endif %}" onclick="toggleFavorite('{{ g.id }}', this, event)">★</button>
     </div>
     <div class="game-meta">
       <span class="game-title">{{ g.title }}</span>
@@ -43,7 +55,15 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="empty"><p>Nenhum jogo encontrado{% if search %} para “{{ search }}”{% endif %}.</p></div>
+<div class="empty">
+  {% if favorites %}
+    <p>Nenhum jogo marcado como favorito nesta consola.</p>
+    <p class="muted">Clica na estrela de qualquer jogo para o adicionares aos teus favoritos.</p>
+    <p style="margin-top:16px"><a class="btn ghost small" href="{{ url_for('console_view', console=console) }}">Ver todos os jogos de {{ console }}</a></p>
+  {% else %}
+    <p>Nenhum jogo encontrado{% if search %} para “{{ search }}”{% endif %}.</p>
+  {% endif %}
+</div>
 {% endif %}
 
 {% endblock %}

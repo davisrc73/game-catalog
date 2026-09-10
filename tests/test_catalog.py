@@ -194,6 +194,91 @@ class TestDatabaseOperations(unittest.TestCase):
         # 5. Termo inexistente
         self.assertEqual(len(models.list_games(search="metroid")), 0)
 
+    def test_favorites_and_random(self):
+        with database.get_conn() as conn:
+            conn.executemany(
+                "INSERT INTO games (id, title, console, path, size_bytes) VALUES (?,?,?,?,?)",
+                [
+                    ("fav1", "Chrono Trigger", "SNES", "/games/snes/ct.sfc", 4000000),
+                    ("fav2", "Super Mario World", "SNES", "/games/snes/smw.sfc", 1000000),
+                    ("other1", "Sonic The Hedgehog", "Mega Drive", "/games/md/sonic.md", 1000000),
+                ],
+            )
+
+        # Inicialmente nenhum é favorito
+        st = models.stats()
+        self.assertEqual(st["favorites"], 0)
+        self.assertEqual(len(models.list_games(favorites_only=True)), 0)
+
+        # Alternar fav1 para favorito
+        res = models.toggle_favorite("fav1")
+        self.assertTrue(res)
+        g = models.get_game("fav1")
+        self.assertEqual(g["favorite"], 1)
+
+        # Stats e listagem
+        st = models.stats()
+        self.assertEqual(st["favorites"], 1)
+        fav_list = models.list_games(favorites_only=True)
+        self.assertEqual(len(fav_list), 1)
+        self.assertEqual(fav_list[0]["id"], "fav1")
+
+        # Alternar fav2
+        models.toggle_favorite("fav2")
+        self.assertEqual(models.stats()["favorites"], 2)
+
+        # Filtro de favoritos com consola
+        snes_favs = models.list_games(console="SNES", favorites_only=True)
+        self.assertEqual(len(snes_favs), 2)
+        md_favs = models.list_games(console="Mega Drive", favorites_only=True)
+        self.assertEqual(len(md_favs), 0)
+
+        # Jogo aleatório
+        rnd = models.get_random_game()
+        self.assertIsNotNone(rnd)
+        self.assertIn(rnd["id"], ["fav1", "fav2", "other1"])
+
+        rnd_md = models.get_random_game(console="Mega Drive")
+        self.assertIsNotNone(rnd_md)
+        self.assertEqual(rnd_md["id"], "other1")
+
+        rnd_fav = models.get_random_game(favorites_only=True)
+        self.assertIn(rnd_fav["id"], ["fav1", "fav2"])
+
+        # Remover favorito
+        res_off = models.toggle_favorite("fav1")
+        self.assertFalse(res_off)
+        self.assertEqual(models.stats()["favorites"], 1)
+
+        # Alternar jogo inexistente
+        self.assertFalse(models.toggle_favorite("nao_existe"))
+
+    def test_database_migration(self):
+        db_legacy = os.path.join(self.temp_dir.name, "legacy.db")
+        with patch.object(config, "DB_PATH", db_legacy):
+            with database.get_conn() as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE games (
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        console TEXT NOT NULL,
+                        path TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    "INSERT INTO games (id, title, console, path) VALUES ('leg1', 'Legacy Game', 'NES', '/leg.nes')"
+                )
+            # Ao inicializar a BD, a coluna favorite deve ser adicionada sem apagar os dados existentes
+            database.init_db()
+            with database.get_conn() as conn:
+                cols = [r["name"] for r in conn.execute("PRAGMA table_info(games)").fetchall()]
+                self.assertIn("favorite", cols)
+                row = conn.execute("SELECT id, title, favorite FROM games WHERE id = 'leg1'").fetchone()
+                self.assertEqual(row["title"], "Legacy Game")
+                self.assertEqual(row["favorite"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,6 +58,53 @@ async function pollStatus(){
 }
 
 // ----------------------------------------------------------------------------
+// Favoritos (Toggle)
+// ----------------------------------------------------------------------------
+async function toggleFavorite(gameId, btn, e){
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!gameId || !btn) return;
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/favorite`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      const isFav = data.favorite;
+      btn.classList.toggle('active', isFav);
+
+      const btnText = btn.querySelector('.btn-text');
+      if (btnText) {
+        btnText.textContent = isFav ? 'Favorito' : 'Marcar Favorito';
+      }
+      btn.title = isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+
+      document.querySelectorAll(`button[onclick*="'${gameId}'"]`).forEach(other => {
+        if (other !== btn) {
+          other.classList.toggle('active', isFav);
+          const otherText = other.querySelector('.btn-text');
+          if (otherText) otherText.textContent = isFav ? 'Favorito' : 'Marcar Favorito';
+          other.title = isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+        }
+      });
+
+      toast(isFav ? '⭐ Adicionado aos favoritos!' : 'Removido dos favoritos.');
+    } else {
+      toast('Não foi possível alterar o estado de favorito.');
+    }
+  } catch (err) {
+    toast('Erro de ligação ao atualizar favorito.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Pesquisa Instantânea ao digitar (Live Search Dropdown)
 // ----------------------------------------------------------------------------
 let liveSearchTimer = null;

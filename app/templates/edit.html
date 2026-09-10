@@ -8,7 +8,7 @@
   <span>Editar</span>
 </nav>
 
-<form class="form" method="post" action="{{ url_for('game_edit', game_id=game.id) }}">
+<form class="form" method="post" action="{{ url_for('game_edit', game_id=game.id) }}" enctype="multipart/form-data">
   <h1>Editar metadados</h1>
 
   <label>Título
@@ -32,13 +32,21 @@
     <textarea name="description" rows="4">{{ game.description or '' }}</textarea>
   </label>
 
-  <label>Substituir capa (URL da imagem)
-    <input type="url" name="cover_url" placeholder="https://…/capa.jpg">
-    <small class="muted">Deixa em branco para manter a capa atual. A capa definida aqui fica fixa e não é substituída no scan.</small>
-  </label>
+  <div class="cover-edit-box">
+    <h3>Capa do jogo</h3>
+    <label>Carregar ficheiro local (.png, .jpg, .webp)
+      <input type="file" name="cover_file" accept=".png,.jpg,.jpeg,.webp">
+      <small class="muted">Carregue diretamente do seu computador ou telemóvel.</small>
+    </label>
+
+    <label style="margin-top:10px">Ou indicar URL da imagem
+      <input type="url" name="cover_url" placeholder="https://…/capa.jpg">
+      <small class="muted">Deixe ambos em branco para manter a capa atual. A capa definida manualmente fica fixa e não é substituída no scan.</small>
+    </label>
+  </div>
 
   <div class="actions">
-    <button class="btn" type="submit">Guardar</button>
+    <button class="btn" type="submit">Guardar alterações</button>
     <a class="btn ghost" href="{{ url_for('game_view', game_id=game.id) }}">Cancelar</a>
   </div>
 </form>

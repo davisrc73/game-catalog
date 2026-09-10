@@ -84,6 +84,19 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
   background:var(--panel);cursor:pointer;display:block;border-top:1px solid var(--line);
 }
 .search-item-all:hover{text-decoration:underline}
+
+/* ---- Topbar actions ---- */
+.topbar-actions{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.btn-random{
+  display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  padding:9px 15px;border-radius:999px;font-weight:600;font-size:.88rem;
+  transition:.18s transform,.18s border-color,.18s color;
+  text-decoration:none;
+}
+.btn-random:hover{transform:translateY(-1px);border-color:var(--accent);color:var(--accent)}
+.btn-random .dice-icon{font-size:1.05rem;line-height:1}
+
 .btn-scan{
   display:inline-flex;align-items:center;gap:8px;cursor:pointer;
   background:linear-gradient(180deg,#2a2636,#211e2c);
@@ -102,11 +115,30 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
 /* ---- Hero / stats ---- */
 .hero{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;margin-bottom:8px}
 .hero h1{font-size:clamp(1.8rem,4vw,2.6rem);margin:0}
-.stats{display:flex;gap:10px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 18px;text-align:center;min-width:84px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 18px;text-align:center;min-width:84px;transition:.18s transform,.18s border-color;
+}
 .stat b{display:block;font-size:1.5rem;font-family:"Bricolage Grotesque"}
 .stat span{font-size:.8rem;color:var(--muted)}
+.stat-fav{cursor:pointer;text-decoration:none}
+.stat-fav:hover{transform:translateY(-2px);border-color:var(--accent)}
+.stat-fav b{color:var(--accent)}
 .scaninfo{margin:14px 0 22px;font-size:.9rem}
+
+/* ---- Filter Tabs ---- */
+.filter-tabs{display:flex;gap:8px;margin:16px 0 22px;flex-wrap:wrap}
+.filter-tab{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;
+  font-size:.86rem;font-weight:600;background:var(--panel);border:1px solid var(--line);
+  color:var(--muted);transition:.15s all;text-decoration:none;
+}
+.filter-tab:hover{color:var(--ink);border-color:var(--muted)}
+.filter-tab.active{
+  background:var(--panel-2);color:var(--accent);border-color:var(--accent);
+  box-shadow:0 0 16px rgba(255,174,59,.15);
+}
 
 /* ---- Console grid ---- */
 .console-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:18px}
@@ -142,6 +174,7 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
 .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:18px}
 .game-card{display:flex;flex-direction:column;gap:8px}
 .cover{
+  position:relative;
   aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--panel);
   border:1px solid var(--line);box-shadow:var(--shadow);
   transition:.2s transform,.2s box-shadow;
@@ -158,6 +191,22 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
 .game-title{font-weight:600;font-size:.95rem;line-height:1.25}
 .game-year{color:var(--muted);font-size:.8rem}
 
+/* ---- Favorite Star Button on Game Cards ---- */
+.fav-btn{
+  position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;
+  border:1px solid rgba(255,255,255,0.14);background:rgba(14,13,19,0.72);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:rgba(255,255,255,0.45);font-size:1.15rem;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;transition:.18s all;z-index:4;
+  padding:0;line-height:1;
+}
+.game-card:not(:hover) .fav-btn:not(.active){opacity:0.35}
+.fav-btn:hover{transform:scale(1.15);color:#ffae3b;background:rgba(14,13,19,0.95);border-color:#ffae3b}
+.fav-btn.active{
+  opacity:1;color:#ffae3b;background:rgba(22,20,30,0.92);border-color:var(--accent);
+  text-shadow:0 0 10px rgba(255,174,59,.8);
+}
+
 /* ---- Detail ---- */
 .detail{display:grid;grid-template-columns:300px 1fr;gap:34px;margin-top:10px}
 .detail-cover .cover-placeholder{border-radius:var(--radius)}
@@ -170,9 +219,24 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
 .facts dt{color:var(--muted)}
 .facts dd{margin:0}
 
+/* ---- Favorite Detail Action ---- */
+.detail-actions{display:flex;gap:12px;align-items:center;margin-top:24px;flex-wrap:wrap}
+.fav-action-btn{
+  display:inline-flex;align-items:center;gap:8px;background:var(--panel);
+  border:1px solid var(--line);color:var(--ink);padding:11px 20px;border-radius:10px;
+  font-weight:700;cursor:pointer;transition:.15s all;
+}
+.fav-action-btn:hover{border-color:var(--accent);color:var(--accent)}
+.fav-action-btn.active{
+  background:rgba(255,174,59,0.15);border-color:var(--accent);color:var(--accent);
+}
+.fav-action-btn .star-icon{font-size:1.15rem;line-height:1;color:var(--muted);transition:.15s color}
+.fav-action-btn.active .star-icon{color:var(--accent);text-shadow:0 0 8px rgba(255,174,59,.6)}
+.fav-badge{font-size:1.15rem;vertical-align:middle;margin-left:8px}
+
 /* ---- Buttons / forms ---- */
 .btn{display:inline-block;cursor:pointer;background:var(--accent);color:#1a1206;font-weight:700;
-  padding:11px 20px;border:none;border-radius:10px;transition:.15s transform}
+  padding:11px 20px;border:none;border-radius:10px;transition:.15s transform;text-decoration:none}
 .btn:hover{transform:translateY(-1px)}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn.small{padding:8px 13px;font-size:.85rem;border-radius:9px}
@@ -188,6 +252,11 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
   padding:10px 12px;border-radius:10px;font:inherit;outline:none;
 }
 .form input:focus,.form textarea:focus{border-color:var(--accent)}
+.cover-edit-box{
+  background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;margin:6px 0;display:flex;flex-direction:column;gap:12px;
+}
+.cover-edit-box h3{margin:0;font-size:1rem;font-family:"Bricolage Grotesque";color:var(--ink)}
 .actions{display:flex;gap:12px;margin-top:6px}
 
 .empty{text-align:center;padding:70px 20px;color:var(--muted)}
@@ -206,4 +275,5 @@ code{background:var(--bg-2);padding:.12em .4em;border-radius:6px;font-size:.85em
   .detail{grid-template-columns:1fr}
   .detail-cover{max-width:240px}
   .form .row{grid-template-columns:1fr}
+  .topbar-actions .btn-random .btn-text{display:none}
 }
