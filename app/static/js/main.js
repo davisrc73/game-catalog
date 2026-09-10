@@ -203,6 +203,95 @@ function escapeHtml(str){
   })[m]);
 }
 
+// ----------------------------------------------------------------------------
+// Definições do Sistema & Testes de API
+// ----------------------------------------------------------------------------
+async function testSteamGrid(e){
+  if (e) e.preventDefault();
+  const input = document.getElementById('steamgriddb_api_key');
+  const resBox = document.getElementById('sgResult');
+  const btn = e ? e.target : null;
+  if (!input || !resBox) return;
+
+  const key = input.value.trim();
+  resBox.hidden = false;
+  resBox.className = 'test-result';
+  resBox.textContent = 'A testar ligação à SteamGridDB…';
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/settings/test-steamgrid', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({api_key: key})
+    });
+    const data = await res.json();
+    resBox.className = 'test-result ' + (data.success ? 'success' : 'error');
+    resBox.textContent = (data.success ? '✓ ' : '✕ ') + data.message;
+  } catch (err) {
+    resBox.className = 'test-result error';
+    resBox.textContent = '✕ Erro de ligação ao testar a API.';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function testIgdb(e){
+  if (e) e.preventDefault();
+  const idInput = document.getElementById('twitch_client_id');
+  const secInput = document.getElementById('twitch_client_secret');
+  const resBox = document.getElementById('igdbResult');
+  const btn = e ? e.target : null;
+  if (!idInput || !secInput || !resBox) return;
+
+  const cid = idInput.value.trim();
+  const csec = secInput.value.trim();
+  resBox.hidden = false;
+  resBox.className = 'test-result';
+  resBox.textContent = 'A autenticar na Twitch / IGDB…';
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/settings/test-igdb', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({client_id: cid, client_secret: csec})
+    });
+    const data = await res.json();
+    resBox.className = 'test-result ' + (data.success ? 'success' : 'error');
+    resBox.textContent = (data.success ? '✓ ' : '✕ ') + data.message;
+  } catch (err) {
+    resBox.className = 'test-result error';
+    resBox.textContent = '✕ Erro de ligação ao autenticar na Twitch.';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function triggerMissingCovers(e){
+  if (e) e.preventDefault();
+  const btn = document.getElementById('btnEnrich');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ A procurar capas…';
+  }
+  try {
+    const res = await fetch('/api/maintenance/fetch-covers', {method: 'POST'});
+    const data = await res.json();
+    toast(data.message);
+    if (data.started) {
+      setBusy(true);
+      pollStatus();
+    }
+  } catch (err) {
+    toast('Erro ao iniciar a procura de capas.');
+  } finally {
+    setTimeout(()=>{
+      if (btn) btn.disabled = false;
+    }, 4000);
+  }
+}
+
 // Inicialização
 document.addEventListener('DOMContentLoaded', ()=>{
   setupLiveSearch();

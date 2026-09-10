@@ -264,5 +264,109 @@ def api_toggle_favorite(game_id):
     return jsonify({"success": True, "favorite": is_fav})
 
 
+# ----------------------------------------------------------------------------
+# Definições do Sistema & Diagnóstico
+# ----------------------------------------------------------------------------
+@app.route("/settings", methods=["GET", "POST"])
+def settings_view():
+    if request.method == "POST":
+        # 1. Atualizar chaves e extensões
+        for key in ("steamgriddb_api_key", "twitch_client_id", "twitch_client_secret", "game_extensions"):
+            val = request.form.get(key, "").strip()
+            if val:
+                models.set_setting(key, val)
+            else:
+                # Se o utilizador limpar o campo, remove da BD para voltar ao fallback do .env
+                models.delete_setting(key)
+
+        # 2. Opções booleanas (checkboxes)
+        models.set_setting("auto_fetch_covers", "1" if request.form.get("auto_fetch_covers") else "0")
+        models.set_setting("auto_fetch_metadata", "1" if request.form.get("auto_fetch_metadata") else "0")
+
+        return redirect(url_for("settings_view", saved="1"))
+
+    effective = models.get_effective_config()
+
+    # Informações de diagnóstico dos volumes montados
+    sources_info = []
+    if config.GAME_SOURCES:
+        for console, path in config.GAME_SOURCES:
+            exists = os.path.isdir(path)
+            game_count = len(models.list_games(console=console))
+            sources_info.append({
+                "console": console,
+                "path": path,
+                "accessible": exists,
+                "games": game_count,
+            })
+    else:
+        root = config.GAMES_ROOT
+        if os.path.isdir(root):
+            for e in sorted(os.scandir(root), key=lambda x: x.name.lower()):
+                if e.is_dir() and e.name.lower() not in config.IGNORE_NAMES:
+                    game_count = len(models.list_games(console=e.name))
+                    sources_info.append({
+                        "console": e.name,
+                        "path": e.path,
+                        "accessible": True,
+                        "games": game_count,
+                    })
+
+    # Diagnóstico de armazenamento
+    db_size = os.path.getsize(config.DB_PATH) if os.path.exists(config.DB_PATH) else 0
+    thumbs_count = len(os.listdir(config.THUMBS_DIR)) if os.path.isdir(config.THUMBS_DIR) else 0
+    missing_covers = models.missing_covers_count()
+
+    diagnostics = {
+        "sources": sources_info,
+        "db_size_mb": round(db_size / (1024 * 1024), 2),
+        "thumbs_count": thumbs_count,
+        "missing_covers": missing_covers,
+        "steamgriddb_active": bool(metadata.get_steamgriddb_key()),
+        "igdb_active": metadata.is_igdb_enabled(),
+        "games_root": config.GAMES_ROOT,
+        "data_dir": config.DATA_DIR,
+    }
+
+    return render_template(
+        "settings.html",
+        config_items=effective,
+        diagnostics=diagnostics,
+        saved=request.args.get("saved") == "1",
+    )
+
+
+@app.route("/api/settings/test-steamgrid", methods=["POST"])
+def api_test_steamgrid():
+    data = request.get_json(silent=True) or {}
+    key = data.get("api_key", "").strip() or metadata.get_steamgriddb_key()
+    ok, msg = metadata.test_steamgriddb(key)
+    return jsonify({"success": ok, "message": msg})
+
+
+@app.route("/api/settings/test-igdb", methods=["POST"])
+def api_test_igdb():
+    data = request.get_json(silent=True) or {}
+    cid = data.get("client_id", "").strip()
+    csec = data.get("client_secret", "").strip()
+    if not (cid and csec):
+        default_cid, default_csec = metadata.get_igdb_credentials()
+        cid = cid or default_cid
+        csec = csec or default_csec
+    ok, msg = metadata.test_igdb(cid, csec)
+    return jsonify({"success": ok, "message": msg})
+
+
+@app.route("/api/maintenance/fetch-covers", methods=["POST"])
+def api_fetch_covers():
+    started = scanner.enrich_missing_async()
+    msg = (
+        "Procura de capas e metadados em falta iniciada em segundo plano."
+        if started
+        else "Já existe um scan ou tarefa de enriquecimento a decorrer."
+    )
+    return jsonify({"started": started, "message": msg})
+
+
 if __name__ == "__main__":
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

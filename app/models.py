@@ -1,5 +1,5 @@
-"""Operações de leitura/escrita sobre a tabela de jogos."""
 import os
+import sqlite3
 from typing import Optional
 
 from . import config
@@ -160,3 +160,128 @@ def stats() -> dict:
             "SELECT COUNT(*) FROM games WHERE favorite = 1"
         ).fetchone()[0]
     return {"total": total, "consoles": consoles, "with_cover": with_cover, "favorites": favorites}
+
+
+def missing_covers_count() -> int:
+    """Devolve o número de jogos sem capa na biblioteca."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM games WHERE cover IS NULL OR cover = ''"
+        ).fetchone()
+    return row[0] if row else 0
+
+
+# ---------------------------------------------------------------------------
+# Gestão de Definições Dinâmicas (tabela settings)
+# ---------------------------------------------------------------------------
+
+def get_setting(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Obtém uma definição persistida na base de dados."""
+    try:
+        with get_conn() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        return default
+
+
+def set_setting(key: str, value: str) -> None:
+    """Grava ou atualiza uma definição na base de dados."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = datetime('now')
+            """,
+            (key, str(value)),
+        )
+
+
+def delete_setting(key: str) -> None:
+    """Remove uma definição da base de dados, revertendo para o fallback."""
+    try:
+        with get_conn() as conn:
+            conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        pass
+
+
+def get_all_settings() -> dict[str, str]:
+    """Devolve todas as definições guardadas na base de dados."""
+    try:
+        with get_conn() as conn:
+            rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        return {r["key"]: r["value"] for r in rows}
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        return {}
+
+
+def get_effective_config() -> dict[str, dict]:
+    """Devolve as configurações do sistema com resolução em cascata (UI vs .env)."""
+    db_settings = get_all_settings()
+
+    defaults_map = {
+        "steamgriddb_api_key": {
+            "env": config.STEAMGRIDDB_API_KEY,
+            "default": "",
+            "label": "Chave API da SteamGridDB",
+            "secret": True,
+        },
+        "twitch_client_id": {
+            "env": config.TWITCH_CLIENT_ID,
+            "default": "",
+            "label": "Twitch Client ID (IGDB)",
+            "secret": False,
+        },
+        "twitch_client_secret": {
+            "env": config.TWITCH_CLIENT_SECRET,
+            "default": "",
+            "label": "Twitch Client Secret (IGDB)",
+            "secret": True,
+        },
+        "auto_fetch_covers": {
+            "env": "1",
+            "default": "1",
+            "label": "Descarregar capas no scan",
+            "secret": False,
+        },
+        "auto_fetch_metadata": {
+            "env": "1",
+            "default": "1",
+            "label": "Descarregar metadados no scan",
+            "secret": False,
+        },
+        "game_extensions": {
+            "env": ", ".join(sorted(config.GAME_EXTENSIONS)),
+            "default": ", ".join(sorted(config.GAME_EXTENSIONS)),
+            "label": "Extensões de ficheiros de jogos",
+            "secret": False,
+        },
+    }
+
+    result = {}
+    for k, meta in defaults_map.items():
+        db_val = db_settings.get(k)
+        if db_val is not None and db_val.strip() != "":
+            val = db_val.strip()
+            source = "db"
+        elif meta["env"]:
+            val = meta["env"]
+            source = "env"
+        else:
+            val = meta["default"]
+            source = "default"
+
+        result[k] = {
+            "value": val,
+            "source": source,
+            "label": meta["label"],
+            "secret": meta["secret"],
+            "is_set_in_db": k in db_settings,
+        }
+
+    return result
+

@@ -55,16 +55,38 @@ def _iter_sources(log=print) -> list[tuple[str, str]]:
     return sources
 
 
+def get_active_extensions() -> set[str]:
+    """Devolve o conjunto de extensões de ficheiro de jogo ativas."""
+    from . import models
+    val = models.get_setting("game_extensions")
+    if val is not None and val.strip():
+        return {e.strip().lower() for e in val.split(",") if e.strip()}
+    return config.GAME_EXTENSIONS
+
+
+def is_auto_fetch_covers_enabled() -> bool:
+    """Verifica se o descarregamento automático de capas está ativo."""
+    from . import models
+    return models.get_setting("auto_fetch_covers", "1") == "1"
+
+
+def is_auto_fetch_metadata_enabled() -> bool:
+    """Verifica se o descarregamento automático de metadados está ativo."""
+    from . import models
+    return models.get_setting("auto_fetch_metadata", "1") == "1"
+
+
 def _is_game_entry(entry: os.DirEntry) -> bool:
     name = entry.name.lower()
     if name in config.IGNORE_NAMES or name.startswith("."):
         return False
     if entry.is_dir():
         return True
-    if not config.GAME_EXTENSIONS:
+    exts = get_active_extensions()
+    if not exts:
         return True
     ext = os.path.splitext(name)[1]
-    return ext in config.GAME_EXTENSIONS
+    return ext in exts
 
 
 def filter_game_entries(entries: list[os.DirEntry]) -> list[os.DirEntry]:
@@ -215,14 +237,14 @@ def scan(fetch_covers: bool = True, log=print) -> dict:
         _scan_lock.release()
 
 
-def _enrich_missing(log=print) -> None:
+def _enrich_missing(log=print, force_covers: bool = False, force_meta: bool = False) -> None:
     """Preenche capa (SteamGridDB) e metadados (IGDB) nos jogos a que faltam.
 
     Regra de ouro: os metadados só preenchem campos VAZIOS. Assim, qualquer
     correção manual feita na página de edição nunca é sobreposta pelo scan.
     """
-    igdb_on = config.IGDB_ENABLED
-    sgdb_on = bool(config.STEAMGRIDDB_API_KEY)
+    igdb_on = metadata.is_igdb_enabled() and (force_meta or is_auto_fetch_metadata_enabled())
+    sgdb_on = bool(metadata.get_steamgriddb_key()) and (force_covers or is_auto_fetch_covers_enabled())
     if not (igdb_on or sgdb_on):
         return
 
@@ -285,5 +307,26 @@ def scan_async(fetch_covers: bool = True) -> bool:
     if is_scanning():
         return False
     t = threading.Thread(target=scan, kwargs={"fetch_covers": fetch_covers}, daemon=True)
+    t.start()
+    return True
+
+
+def enrich_missing_async() -> bool:
+    """Lança o enriquecimento de capas e metadados numa thread independente.
+
+    Devolve False se já existir um scan ou enriquecimento a decorrer.
+    """
+    if is_scanning():
+        return False
+
+    def _worker():
+        if not _scan_lock.acquire(blocking=False):
+            return
+        try:
+            _enrich_missing(log=print, force_covers=True, force_meta=True)
+        finally:
+            _scan_lock.release()
+
+    t = threading.Thread(target=_worker, daemon=True)
     t.start()
     return True

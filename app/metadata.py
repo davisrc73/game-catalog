@@ -11,6 +11,7 @@ import os
 import re
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -22,6 +23,77 @@ _TAG_RE = re.compile(r"[\(\[][^\)\]]*[\)\]]")          # (USA), [!], (Rev 1)...
 _SEP_RE = re.compile(r"[._]+")                          # pontos/underscores -> espaço
 _MULTISPACE_RE = re.compile(r"\s{2,}")
 _USER_AGENT = "GameCatalog/1.0 (+https://localhost)"
+
+
+def get_steamgriddb_key() -> str:
+    """Devolve a chave ativa da SteamGridDB (da BD ou do .env)."""
+    from . import models
+    val = models.get_setting("steamgriddb_api_key")
+    if val is not None and val.strip():
+        return val.strip()
+    return config.STEAMGRIDDB_API_KEY
+
+
+def get_igdb_credentials() -> tuple[str, str]:
+    """Devolve (client_id, client_secret) ativos para o IGDB."""
+    from . import models
+    cid = models.get_setting("twitch_client_id")
+    csec = models.get_setting("twitch_client_secret")
+    client_id = cid.strip() if (cid is not None and cid.strip()) else config.TWITCH_CLIENT_ID
+    client_secret = csec.strip() if (csec is not None and csec.strip()) else config.TWITCH_CLIENT_SECRET
+    return client_id, client_secret
+
+
+def is_igdb_enabled() -> bool:
+    """Verifica se as credenciais do IGDB estão configuradas."""
+    cid, csec = get_igdb_credentials()
+    return bool(cid and csec)
+
+
+def test_steamgriddb(api_key: str) -> tuple[bool, str]:
+    """Testa a validade de uma chave SteamGridDB."""
+    key = api_key.strip()
+    if not key:
+        return False, "A chave não pode estar vazia."
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "User-Agent": _USER_AGENT,
+    }
+    try:
+        res = _http_json("https://www.steamgriddb.com/api/v2/search/autocomplete/Mario", headers)
+        if res.get("success"):
+            return True, "Ligação à SteamGridDB estabelecida com sucesso!"
+        errs = res.get("errors", ["Erro desconhecido da API."])
+        return False, errs[0] if isinstance(errs, list) else str(errs)
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return False, "Chave inválida ou não autorizada (HTTP 401)."
+        return False, f"Erro HTTP {e.code}: {e.reason}"
+    except Exception as e:
+        return False, f"Falha de ligação: {e}"
+
+
+def test_igdb(client_id: str, client_secret: str) -> tuple[bool, str]:
+    """Testa a validade das credenciais Twitch para acesso ao IGDB."""
+    cid, csec = client_id.strip(), client_secret.strip()
+    if not cid or not csec:
+        return False, "Client ID e Client Secret são obrigatórios."
+    params = urllib.parse.urlencode({
+        "client_id": cid,
+        "client_secret": csec,
+        "grant_type": "client_credentials",
+    }).encode("utf-8")
+    try:
+        resp = _http_post(_TWITCH_TOKEN_URL, params, {"User-Agent": _USER_AGENT})
+        if resp.get("access_token"):
+            return True, "Autenticação na Twitch / IGDB realizada com sucesso!"
+        return False, "A Twitch não devolveu um token de acesso válido."
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 401, 403):
+            return False, "Credenciais inválidas da Twitch (Client ID ou Secret incorreto)."
+        return False, f"Erro HTTP {e.code}: {e.reason}"
+    except Exception as e:
+        return False, f"Falha de ligação: {e}"
 
 
 def is_safe_url(url: str) -> bool:
@@ -74,11 +146,12 @@ def fetch_cover_bytes(title: str) -> tuple[bytes, str] | None:
     Usa a API do SteamGridDB: procura o jogo por nome e descarrega a primeira
     grelha (capa vertical) disponível.
     """
-    if not config.STEAMGRIDDB_API_KEY:
+    sgdb_key = get_steamgriddb_key()
+    if not sgdb_key:
         return None
 
     headers = {
-        "Authorization": f"Bearer {config.STEAMGRIDDB_API_KEY}",
+        "Authorization": f"Bearer {sgdb_key}",
         "User-Agent": _USER_AGENT,
     }
     try:
@@ -128,7 +201,7 @@ _IGDB_GAMES_URL = "https://api.igdb.com/v4/games"
 
 # Cache do token em memória (partilhado entre threads do servidor).
 _token_lock = threading.Lock()
-_token_cache = {"value": None, "expires_at": 0.0}
+_token_cache = {"value": None, "expires_at": 0.0, "client_id": "", "client_secret": ""}
 
 
 def _http_post(url: str, data: bytes, headers: dict) -> dict:
@@ -139,15 +212,18 @@ def _http_post(url: str, data: bytes, headers: dict) -> dict:
 
 def _get_igdb_token() -> str | None:
     """Obtém (e reutiliza) um token de aplicação da Twitch para o IGDB."""
-    if not config.IGDB_ENABLED:
+    if not is_igdb_enabled():
         return None
+    client_id, client_secret = get_igdb_credentials()
     with _token_lock:
         now = time.time()
+        if _token_cache.get("client_id") != client_id or _token_cache.get("client_secret") != client_secret:
+            _token_cache["value"] = None
         if _token_cache["value"] and now < _token_cache["expires_at"]:
             return _token_cache["value"]
         params = urllib.parse.urlencode({
-            "client_id": config.TWITCH_CLIENT_ID,
-            "client_secret": config.TWITCH_CLIENT_SECRET,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "grant_type": "client_credentials",
         }).encode("utf-8")
         try:
@@ -162,12 +238,15 @@ def _get_igdb_token() -> str | None:
         ttl = int(resp.get("expires_in", 3600))
         _token_cache["value"] = token
         _token_cache["expires_at"] = now + max(60, ttl - 300)
+        _token_cache["client_id"] = client_id
+        _token_cache["client_secret"] = client_secret
         return token
 
 
 def _igdb_query(token: str, body: str) -> list:
+    client_id, _ = get_igdb_credentials()
     headers = {
-        "Client-ID": config.TWITCH_CLIENT_ID,
+        "Client-ID": client_id,
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
         "Content-Type": "text/plain",

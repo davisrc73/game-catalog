@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS scans (
     removed    INTEGER DEFAULT 0,
     status     TEXT DEFAULT 'running'
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 

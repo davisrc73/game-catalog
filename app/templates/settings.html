@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Definições do Sistema · Catálogo{% endblock %}
+{% block content %}
+
+<nav class="crumbs">
+  <a href="{{ url_for('index') }}">Catálogo</a> / <span>Definições</span>
+</nav>
+
+<div class="page-head">
+  <div>
+    <h1>⚙️ Definições do Sistema</h1>
+    <p class="muted">Configurações persistentes, validação de APIs e diagnóstico de volumes do NAS.</p>
+  </div>
+</div>
+
+{% if saved %}
+<div class="alert-success">
+  <span>✓ As alterações foram guardadas com sucesso na base de dados.</span>
+</div>
+{% endif %}
+
+<div class="settings-grid">
+
+  <!-- Formulário de Definições -->
+  <form class="settings-form" method="post" action="{{ url_for('settings_view') }}">
+    
+    <!-- Cartão 1: Integrações & APIs -->
+    <div class="settings-card">
+      <div class="card-head">
+        <h2>🌐 Integrações & APIs de Metadados</h2>
+        <p class="muted">As credenciais configuradas aqui têm prioridade sobre o ficheiro <code>.env</code> e não requerem reinício do Docker.</p>
+      </div>
+
+      <!-- SteamGridDB -->
+      <div class="setting-group">
+        <div class="group-title-row">
+          <label for="steamgriddb_api_key"><b>SteamGridDB (Capas Automáticas)</b></label>
+          {% set sg = config_items.steamgriddb_api_key %}
+          {% if sg.source == 'db' %}
+            <span class="source-badge db" title="Guardado na base de dados SQLite">Definido na UI</span>
+          {% elif sg.source == 'env' %}
+            <span class="source-badge env" title="Definido no .env ou docker-compose">Herdado do .env</span>
+          {% else %}
+            <span class="source-badge none">Inativo</span>
+          {% endif %}
+        </div>
+        <div class="input-with-action">
+          <input id="steamgriddb_api_key" type="password" name="steamgriddb_api_key"
+                 value="{{ sg.value }}" placeholder="Insere a tua chave de API da SteamGridDB…"
+                 autocomplete="off">
+          <button type="button" class="btn ghost small" onclick="testSteamGrid(event)">
+            Testar ligação
+          </button>
+        </div>
+        <div id="sgResult" class="test-result" hidden></div>
+        <small class="muted">
+          Obtém uma chave gratuita em <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener">steamgriddb.com/profile/preferences/api</a>. Deixa em branco para usar o <code>.env</code>.
+        </small>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Twitch / IGDB -->
+      <div class="setting-group">
+        <div class="group-title-row">
+          <label><b>Twitch / IGDB (Ano, Género, Descrição)</b></label>
+          {% set tw_id = config_items.twitch_client_id %}
+          {% if tw_id.source == 'db' %}
+            <span class="source-badge db" title="Guardado na base de dados SQLite">Definido na UI</span>
+          {% elif tw_id.source == 'env' %}
+            <span class="source-badge env" title="Definido no .env ou docker-compose">Herdado do .env</span>
+          {% else %}
+            <span class="source-badge none">Inativo</span>
+          {% endif %}
+        </div>
+        
+        <div class="row" style="margin-bottom:8px">
+          <label>Client ID
+            <input id="twitch_client_id" type="text" name="twitch_client_id"
+                   value="{{ tw_id.value }}" placeholder="Ex: gp762nuuoqcoxypju8c569th9wz7q5">
+          </label>
+          <label>Client Secret
+            <input id="twitch_client_secret" type="password" name="twitch_client_secret"
+                   value="{{ config_items.twitch_client_secret.value }}" placeholder="Segredo da aplicação Twitch…"
+                   autocomplete="off">
+          </label>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center">
+          <button type="button" class="btn ghost small" onclick="testIgdb(event)">
+            Testar ligação IGDB
+          </button>
+        </div>
+        <div id="igdbResult" class="test-result" hidden></div>
+        <small class="muted">
+          Cria uma aplicação em <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener">dev.twitch.tv/console/apps</a> para obter Client ID e Secret.
+        </small>
+      </div>
+    </div>
+
+    <!-- Cartão 2: Opções de Scan & Biblioteca -->
+    <div class="settings-card">
+      <div class="card-head">
+        <h2>🔍 Comportamento do Scan & Ficheiros</h2>
+        <p class="muted">Controla o que acontece quando clicas em <b>Fazer scan</b> no topo.</p>
+      </div>
+
+      <div class="setting-group checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="auto_fetch_covers" value="1"
+                 {% if config_items.auto_fetch_covers.value == '1' %}checked{% endif %}>
+          <span><b>Descarregar capas automaticamente</b> (se a SteamGridDB estiver configurada)</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="auto_fetch_metadata" value="1"
+                 {% if config_items.auto_fetch_metadata.value == '1' %}checked{% endif %}>
+          <span><b>Descarregar metadados do IGDB</b> (ano, género e sinopse)</span>
+        </label>
+      </div>
+
+      <div class="setting-group" style="margin-top:14px">
+        <label for="game_extensions"><b>Extensões de ficheiro reconhecidas</b>
+          <textarea id="game_extensions" name="game_extensions" rows="3"
+                    placeholder=".nsp, .xci, .iso, .cso, .chd, .zip, .bin, .cue...">{{ config_items.game_extensions.value }}</textarea>
+          <small class="muted">Separe por vírgulas. Pastas dentro de cada consola contam sempre como um jogo, independentemente das extensões.</small>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button type="submit" class="btn">Guardar alterações</button>
+      <a href="{{ url_for('settings_view') }}" class="btn ghost">Cancelar</a>
+    </div>
+
+  </form>
+
+  <!-- Painel Lateral: Diagnóstico & Manutenção -->
+  <aside class="settings-sidebar">
+
+    <!-- Diagnóstico de Volumes -->
+    <div class="settings-card">
+      <div class="card-head">
+        <h2>📂 Volumes & Pastas Montadas</h2>
+        <p class="muted">Pastas montadas através do Docker (<code>docker-compose.yml</code>).</p>
+      </div>
+
+      {% if diagnostics.sources %}
+      <div class="vol-list">
+        {% for s in diagnostics.sources %}
+        <div class="vol-item">
+          <div class="vol-header">
+            <span class="vol-status-dot {% if s.accessible %}ok{% else %}error{% endif %}"></span>
+            <span class="vol-console"><b>{{ s.console }}</b></span>
+            <span class="vol-count muted">{{ s.games }} jogo{{ 's' if s.games != 1 else '' }}</span>
+          </div>
+          <code class="vol-path">{{ s.path }}</code>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">Nenhuma origem de consola configurada.</p>
+      {% endif %}
+    </div>
+
+    <!-- Estatísticas de Armazenamento e Manutenção -->
+    <div class="settings-card">
+      <div class="card-head">
+        <h2>🛠️ Diagnóstico & Manutenção</h2>
+      </div>
+
+      <div class="diag-facts">
+        <div class="diag-fact">
+          <span class="fact-label">Base de Dados SQLite</span>
+          <span class="fact-val"><b>{{ diagnostics.db_size_mb }} MB</b></span>
+        </div>
+        <div class="diag-fact">
+          <span class="fact-label">Capas em cache</span>
+          <span class="fact-val"><b>{{ diagnostics.thumbs_count }}</b></span>
+        </div>
+        <div class="diag-fact">
+          <span class="fact-label">Jogos sem capa</span>
+          <span class="fact-val"><b style="color:var(--accent)">{{ diagnostics.missing_covers }}</b></span>
+        </div>
+      </div>
+
+      {% if diagnostics.missing_covers > 0 %}
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
+        <p class="muted" style="font-size:0.86rem;margin-bottom:10px">
+          Podes procurar capas e metadados para os jogos em falta sem ter de re-escanear todo o disco.
+        </p>
+        <button id="btnEnrich" type="button" class="btn ghost small" style="width:100%" onclick="triggerMissingCovers(event)">
+          🎨 Procurar capas em falta ({{ diagnostics.missing_covers }})
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+  </aside>
+
+</div>
+
+{% endblock %}

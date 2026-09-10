@@ -104,6 +104,32 @@ class TestSecurity(unittest.TestCase):
                 self.assertTrue(is_safe_url(u))
 
 
+class TestApiValidation(unittest.TestCase):
+    def test_steamgriddb_validation(self):
+        # Chave vazia
+        ok, msg = metadata.test_steamgriddb("")
+        self.assertFalse(ok)
+        self.assertIn("vazia", msg)
+
+        # Sucesso simulado
+        with patch.object(metadata, "_http_json", return_value={"success": True, "data": []}):
+            ok, msg = metadata.test_steamgriddb("valid_key")
+            self.assertTrue(ok)
+            self.assertIn("sucesso", msg)
+
+    def test_igdb_validation(self):
+        # Credenciais incompletas
+        ok, msg = metadata.test_igdb("", "secret")
+        self.assertFalse(ok)
+        self.assertIn("obrigatórios", msg)
+
+        # Sucesso simulado
+        with patch.object(metadata, "_http_post", return_value={"access_token": "token123", "expires_in": 3600}):
+            ok, msg = metadata.test_igdb("cid", "csec")
+            self.assertTrue(ok)
+            self.assertIn("sucesso", msg)
+
+
 class TestDatabaseOperations(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -278,6 +304,52 @@ class TestDatabaseOperations(unittest.TestCase):
                 row = conn.execute("SELECT id, title, favorite FROM games WHERE id = 'leg1'").fetchone()
                 self.assertEqual(row["title"], "Legacy Game")
                 self.assertEqual(row["favorite"], 0)
+
+    def test_settings_and_cascade_config(self):
+        # 1. Definições vazias
+        self.assertIsNone(models.get_setting("steamgriddb_api_key"))
+        self.assertEqual(models.get_setting("custom_key", "default_val"), "default_val")
+
+        # 2. Gravar e ler
+        models.set_setting("steamgriddb_api_key", "test_sg_key_123")
+        self.assertEqual(models.get_setting("steamgriddb_api_key"), "test_sg_key_123")
+        self.assertEqual(metadata.get_steamgriddb_key(), "test_sg_key_123")
+
+        # 3. get_effective_config reflete valor da DB
+        eff = models.get_effective_config()
+        self.assertEqual(eff["steamgriddb_api_key"]["value"], "test_sg_key_123")
+        self.assertEqual(eff["steamgriddb_api_key"]["source"], "db")
+
+        # 4. Apagar definição volta ao fallback
+        models.delete_setting("steamgriddb_api_key")
+        self.assertIsNone(models.get_setting("steamgriddb_api_key"))
+        eff_after = models.get_effective_config()
+        self.assertNotEqual(eff_after["steamgriddb_api_key"]["source"], "db")
+
+        # 5. Twitch / IGDB
+        models.set_setting("twitch_client_id", "my_cid")
+        models.set_setting("twitch_client_secret", "my_csec")
+        cid, csec = metadata.get_igdb_credentials()
+        self.assertEqual(cid, "my_cid")
+        self.assertEqual(csec, "my_csec")
+        self.assertTrue(metadata.is_igdb_enabled())
+
+        # 6. Extensões dinâmicas
+        models.set_setting("game_extensions", ".custom, .xci")
+        active_exts = scanner.get_active_extensions()
+        self.assertEqual(active_exts, {".custom", ".xci"})
+
+    def test_missing_covers_count(self):
+        with database.get_conn() as conn:
+            conn.executemany(
+                "INSERT INTO games (id, title, console, path, cover) VALUES (?,?,?,?,?)",
+                [
+                    ("c1", "Game With Cover", "Switch", "/g1.nsp", "c1.jpg"),
+                    ("c2", "Game Without Cover", "Switch", "/g2.nsp", None),
+                    ("c3", "Game Empty Cover", "Switch", "/g3.nsp", ""),
+                ],
+            )
+        self.assertEqual(models.missing_covers_count(), 2)
 
 
 if __name__ == "__main__":
