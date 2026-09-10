@@ -1,11 +1,8 @@
-// Pesquisa: redireciona para a consola atual ou pesquisa global
+// Pesquisa global universal em toda a biblioteca
 function doSearch(e){
   e.preventDefault();
   const q = document.getElementById('globalSearch').value.trim();
-  const m = location.pathname.match(/\/console\/([^/]+)/);
-  if (m){
-    location.href = `/console/${m[1]}` + (q ? `?q=${encodeURIComponent(q)}` : '');
-  } else if (q){
+  if (q){
     location.href = `/search?q=${encodeURIComponent(q)}`;
   } else {
     location.href = `/search`;

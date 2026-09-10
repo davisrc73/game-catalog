@@ -6,15 +6,15 @@
   <title>{% block title %}Catálogo de Jogos{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.2">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="{{ url_for('index') }}">
       <span class="brand-mark">▚</span> Catálogo<span class="brand-dim">/NAS</span>
     </a>
-    <form class="search" action="{{ url_for('console_view', console=request.view_args.get('console','')) if request.view_args and request.view_args.get('console') else url_for('search_view') }}" method="get" onsubmit="return doSearch(event)">
-      <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo…" aria-label="Pesquisar jogos" value="{{ request.args.get('q','') }}">
+    <form class="search" action="{{ url_for('search_view') }}" method="get" onsubmit="return doSearch(event)">
+      <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo em toda a biblioteca…" aria-label="Pesquisar jogos" value="{{ request.args.get('q','') }}">
     </form>
     <button id="scanBtn" class="btn-scan" onclick="startScan()">
       <span class="dot"></span> Fazer scan
@@ -30,6 +30,6 @@
   </footer>
 
   <div id="toast" class="toast"></div>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}?v=1.2"></script>
 </body>
 </html>

@@ -32,7 +32,11 @@
 {% else %}
 <div class="empty">
   <p>Nenhum jogo encontrado{% if query %} para “{{ query }}”{% endif %}.</p>
-  <p class="muted">Tente procurar por palavras-chave diferentes ou verifique a ortografia.</p>
+  {% if catalog_total == 0 %}
+    <p class="muted">A sua biblioteca ainda não tem jogos indexados. Carregue em <b>Fazer scan</b> no topo para sincronizar os ficheiros do NAS.</p>
+  {% else %}
+    <p class="muted">Tente procurar por palavras-chave mais simples, pelo nome da consola, género ou parte do título.</p>
+  {% endif %}
 </div>
 {% endif %}
 

@@ -5,6 +5,7 @@ Usa-se WAL para melhor concorrência entre o scan e a leitura no browser.
 """
 import os
 import sqlite3
+import unicodedata
 from contextlib import contextmanager
 
 from . import config
@@ -40,6 +41,14 @@ CREATE TABLE IF NOT EXISTS scans (
 """
 
 
+def normalize_text(text: str | None) -> str:
+    """Normaliza texto removendo acentos e convertendo para minúsculas."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFD", str(text).lower())
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+
+
 def init_db() -> None:
     os.makedirs(config.DATA_DIR, exist_ok=True)
     os.makedirs(config.THUMBS_DIR, exist_ok=True)
@@ -52,6 +61,7 @@ def init_db() -> None:
 def get_conn():
     conn = sqlite3.connect(config.DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.create_function("norm", 1, normalize_text)
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA foreign_keys=ON;")

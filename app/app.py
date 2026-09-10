@@ -24,6 +24,9 @@ def inject_globals():
 # ----------------------------------------------------------------------------
 @app.route("/")
 def index():
+    q = request.args.get("q", "").strip()
+    if q:
+        return redirect(url_for("search_view", q=q))
     consoles = []
     for c in models.list_consoles():
         name = c["console"]
@@ -46,7 +49,13 @@ def index():
 def search_view():
     query = request.args.get("q", "").strip()
     games = models.list_games(console=None, search=query) if query else []
-    return render_template("search.html", query=query, games=games)
+    catalog_total = models.stats().get("total", 0)
+    return render_template(
+        "search.html",
+        query=query,
+        games=games,
+        catalog_total=catalog_total,
+    )
 
 
 @app.route("/console/<console>")

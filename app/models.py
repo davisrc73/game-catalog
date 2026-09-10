@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 from . import config
-from .database import get_conn
+from .database import get_conn, normalize_text
 
 
 def list_consoles() -> list[dict]:
@@ -17,14 +17,29 @@ def list_consoles() -> list[dict]:
 
 
 def list_games(console: Optional[str] = None, search: Optional[str] = None) -> list[dict]:
+    """Lista jogos com suporte a filtro por consola e pesquisa multi-termo insensível a acentos."""
     sql = "SELECT * FROM games WHERE 1=1"
     params: list = []
     if console:
         sql += " AND console = ?"
         params.append(console)
     if search:
-        sql += " AND title LIKE ?"
-        params.append(f"%{search}%")
+        # Divide a pesquisa em palavras para que múltiplos termos coincidam
+        # (ex: 'mario switch' encontra Mario na Switch, 'zelda breath' encontra Zelda)
+        keywords = [w.strip() for w in search.split() if w.strip()]
+        for kw in keywords:
+            clean_kw = normalize_text(kw)
+            sql += (
+                " AND ("
+                "norm(title) LIKE ? "
+                "OR norm(console) LIKE ? "
+                "OR norm(genre) LIKE ? "
+                "OR norm(path) LIKE ? "
+                "OR norm(description) LIKE ?"
+                ")"
+            )
+            term = f"%{clean_kw}%"
+            params.extend([term, term, term, term, term])
     sql += " ORDER BY title COLLATE NOCASE"
     with get_conn() as conn:
         rows = conn.execute(sql, params).fetchall()

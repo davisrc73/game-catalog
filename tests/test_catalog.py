@@ -162,6 +162,38 @@ class TestDatabaseOperations(unittest.TestCase):
         self.assertTrue(deleted)
         self.assertIsNone(models.get_game("id123"))
 
+    def test_advanced_search(self):
+        with database.get_conn() as conn:
+            conn.executemany(
+                "INSERT INTO games (id, title, console, genre, path, size_bytes) VALUES (?,?,?,?,?,?)",
+                [
+                    ("g1", "Pokémon: Edição Esmeralda", "Game Boy Advance", "RPG", "/games/gba/pkmn.gba", 16000000),
+                    ("g2", "The Legend of Zelda: Breath of the Wild", "Nintendo Switch", "Ação e Aventura", "/games/switch/botw.nsp", 14000000000),
+                    ("g3", "Super Mario Odyssey", "Nintendo Switch", "Plataformas", "/games/switch/smo.nsp", 6000000000),
+                ],
+            )
+
+        # 1. Insensibilidade a acentos
+        self.assertEqual(len(models.list_games(search="pokemon")), 1)
+        self.assertEqual(len(models.list_games(search="POKÉMON")), 1)
+        self.assertEqual(len(models.list_games(search="esmeralda")), 1)
+        self.assertEqual(len(models.list_games(search="acao")), 1)
+
+        # 2. Pesquisa multi-palavra / tokens não contíguos
+        self.assertEqual(len(models.list_games(search="zelda breath")), 1)
+        self.assertEqual(len(models.list_games(search="mario odyssey")), 1)
+
+        # 3. Pesquisa cruzada por consola e título
+        self.assertEqual(len(models.list_games(search="switch mario")), 1)
+        self.assertEqual(len(models.list_games(search="gba pokemon")), 1)
+
+        # 4. Pesquisa por género e extensão/caminho
+        self.assertEqual(len(models.list_games(search="rpg")), 1)
+        self.assertEqual(len(models.list_games(search="nsp")), 2)
+
+        # 5. Termo inexistente
+        self.assertEqual(len(models.list_games(search="metroid")), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
