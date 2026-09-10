@@ -1,15 +1,4 @@
-// Pesquisa global universal em toda a biblioteca
-function doSearch(e){
-  e.preventDefault();
-  const q = document.getElementById('globalSearch').value.trim();
-  if (q){
-    location.href = `/search?q=${encodeURIComponent(q)}`;
-  } else {
-    location.href = `/search`;
-  }
-  return false;
-}
-
+// Toast de notificações
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -18,6 +7,7 @@ function toast(msg){
   t._t = setTimeout(()=>t.classList.remove('show'), 3500);
 }
 
+// Controlo do botão de scan
 let pollTimer = null;
 
 async function startScan(){
@@ -67,8 +57,109 @@ async function pollStatus(){
   }
 }
 
-// Ao abrir a página, se já houver um scan a decorrer, mostra o estado.
+// ----------------------------------------------------------------------------
+// Pesquisa Instantânea ao digitar (Live Search Dropdown)
+// ----------------------------------------------------------------------------
+let liveSearchTimer = null;
+
+function setupLiveSearch(){
+  const input = document.getElementById('globalSearch');
+  const dropdown = document.getElementById('searchResultsDropdown');
+  if (!input || !dropdown) return;
+
+  input.addEventListener('input', () => {
+    clearTimeout(liveSearchTimer);
+    const q = input.value.trim();
+    if (!q) {
+      dropdown.hidden = true;
+      dropdown.innerHTML = '';
+      return;
+    }
+    liveSearchTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        renderDropdown(data, q, dropdown);
+      } catch (err) {
+        dropdown.hidden = true;
+      }
+    }, 150);
+  });
+
+  // Fechar ao clicar fora
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target) && e.target !== input) {
+      dropdown.hidden = true;
+    }
+  });
+
+  // Reabrir ao focar se tiver texto
+  input.addEventListener('focus', () => {
+    if (input.value.trim() && dropdown.children.length > 0) {
+      dropdown.hidden = false;
+    }
+  });
+
+  // Fechar com tecla Escape
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      dropdown.hidden = true;
+    }
+  });
+}
+
+function renderDropdown(data, query, dropdown){
+  if (!data || !data.results || data.results.length === 0) {
+    dropdown.innerHTML = `
+      <div style="padding:14px;text-align:center;color:var(--muted);font-size:0.88rem;">
+        Nenhum jogo encontrado para “${escapeHtml(query)}”
+      </div>
+    `;
+    dropdown.hidden = false;
+    return;
+  }
+
+  let html = '';
+  data.results.forEach(g => {
+    const thumb = g.cover_url
+      ? `<img src="${g.cover_url}" alt="${escapeHtml(g.title)}">`
+      : `<span>${escapeHtml(g.title[0] || '?').toUpperCase()}</span>`;
+    const meta = [g.console, g.year].filter(Boolean).join(' · ');
+
+    html += `
+      <a class="search-item" href="${g.url}">
+        <div class="search-item-thumb">${thumb}</div>
+        <div class="search-item-info">
+          <span class="search-item-title">${escapeHtml(g.title)}</span>
+          <span class="search-item-meta">${escapeHtml(meta)}</span>
+        </div>
+      </a>
+    `;
+  });
+
+  if (data.total > data.results.length) {
+    html += `
+      <a class="search-item-all" href="/?q=${encodeURIComponent(query)}">
+        Ver todos os ${data.total} resultados ➔
+      </a>
+    `;
+  }
+
+  dropdown.innerHTML = html;
+  dropdown.hidden = false;
+}
+
+function escapeHtml(str){
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[m]);
+}
+
+// Inicialização
 document.addEventListener('DOMContentLoaded', ()=>{
+  setupLiveSearch();
+
   fetch('/api/status').then(r=>r.json()).then(s=>{
     if (s.scanning){ document.body.dataset.wasScanning='1'; setBusy(true); pollStatus(); }
   }).catch(()=>{});

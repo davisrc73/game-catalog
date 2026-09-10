@@ -6,15 +6,22 @@
   <title>{% block title %}Catálogo de Jogos{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.3">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="{{ url_for('index') }}">
       <span class="brand-mark">▚</span> Catálogo<span class="brand-dim">/NAS</span>
     </a>
-    <form class="search" action="{{ url_for('search_view') }}" method="get" onsubmit="return doSearch(event)">
-      <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo em toda a biblioteca…" aria-label="Pesquisar jogos" value="{{ request.args.get('q','') }}">
+    <form class="search" action="{{ url_for('index') }}" method="get">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo em toda a biblioteca…" aria-label="Pesquisar jogos" value="{{ search or query or request.args.get('q','') }}" autocomplete="off">
+        {% if search or query or request.args.get('q') %}
+          <a href="{{ url_for('index') }}" class="search-clear" title="Limpar pesquisa">✕</a>
+        {% endif %}
+        <div id="searchResultsDropdown" class="search-dropdown" hidden></div>
+      </div>
     </form>
     <button id="scanBtn" class="btn-scan" onclick="startScan()">
       <span class="dot"></span> Fazer scan
@@ -30,6 +37,6 @@
   </footer>
 
   <div id="toast" class="toast"></div>
-  <script src="{{ url_for('static', filename='js/main.js') }}?v=1.2"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}?v=1.3"></script>
 </body>
 </html>

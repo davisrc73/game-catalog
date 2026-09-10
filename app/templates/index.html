@@ -1,6 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Catálogo de Jogos{% endblock %}
+{% block title %}{% if search %}Pesquisa: {{ search }} · Catálogo{% else %}Catálogo de Jogos{% endif %}{% endblock %}
 {% block content %}
+
+{% if search %}
+
+<nav class="crumbs">
+  <a href="{{ url_for('index') }}">Catálogo</a> / <span>Pesquisa</span>
+</nav>
+
+<div class="page-head">
+  <div>
+    <h1>Resultados da pesquisa</h1>
+    <span class="muted">{{ games|length }} jogo{{ 's' if games|length != 1 else '' }} para “{{ search }}”</span>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost small" href="{{ url_for('index') }}">Ver todas as consolas</a>
+  </div>
+</div>
+
+{% if games %}
+<div class="game-grid">
+  {% for g in games %}
+  <a class="game-card" href="{{ url_for('game_view', game_id=g.id) }}">
+    <div class="cover">
+      {% if g.cover %}
+        <img loading="lazy" src="{{ url_for('cover', filename=g.cover) }}" alt="{{ g.title }}">
+      {% else %}
+        <div class="cover-placeholder"><span>{{ g.title[0]|upper }}</span></div>
+      {% endif %}
+    </div>
+    <div class="game-meta">
+      <span class="game-title">{{ g.title }}</span>
+      <span class="game-year">{{ g.console }}{% if g.year %} · {{ g.year }}{% endif %}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>Nenhum jogo encontrado para “{{ search }}”.</p>
+  {% if stats.total == 0 %}
+    <p class="muted">A sua biblioteca ainda não tem jogos indexados. Carregue em <b>Fazer scan</b> no topo para sincronizar os ficheiros do NAS.</p>
+  {% else %}
+    <p class="muted">Tente procurar por palavras-chave mais simples, pelo nome da consola ou parte do título.</p>
+  {% endif %}
+  <p style="margin-top:16px"><a class="btn ghost small" href="{{ url_for('index') }}">Voltar às consolas</a></p>
+</div>
+{% endif %}
+
+{% else %}
 
 <section class="hero">
   <div>
@@ -45,6 +93,8 @@
   <p>Ainda não há jogos no catálogo.</p>
   <p class="muted">Carrega em <b>Fazer scan</b> para analisar as pastas do NAS.</p>
 </div>
+{% endif %}
+
 {% endif %}
 
 {% endblock %}

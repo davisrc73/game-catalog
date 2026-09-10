@@ -24,9 +24,18 @@ def inject_globals():
 # ----------------------------------------------------------------------------
 @app.route("/")
 def index():
-    q = request.args.get("q", "").strip()
-    if q:
-        return redirect(url_for("search_view", q=q))
+    search = request.args.get("q", "").strip() or request.args.get("search", "").strip()
+    if search:
+        games = models.list_games(console=None, search=search)
+        return render_template(
+            "index.html",
+            search=search,
+            games=games,
+            stats=models.stats(),
+            last_scan=models.last_scan(),
+            scanning=scanner.is_scanning(),
+        )
+
     consoles = []
     for c in models.list_consoles():
         name = c["console"]
@@ -48,14 +57,26 @@ def index():
 @app.route("/search")
 def search_view():
     query = request.args.get("q", "").strip()
-    games = models.list_games(console=None, search=query) if query else []
-    catalog_total = models.stats().get("total", 0)
-    return render_template(
-        "search.html",
-        query=query,
-        games=games,
-        catalog_total=catalog_total,
-    )
+    return redirect(url_for("index", q=query))
+
+
+@app.route("/api/search")
+def api_search():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"results": [], "total": 0})
+    games = models.list_games(console=None, search=q)
+    results = []
+    for g in games[:8]:
+        results.append({
+            "id": g["id"],
+            "title": g["title"],
+            "console": g["console"],
+            "year": g.get("year"),
+            "url": url_for("game_view", game_id=g["id"]),
+            "cover_url": url_for("cover", filename=g["cover"]) if g.get("cover") else None,
+        })
+    return jsonify({"results": results, "total": len(games)})
 
 
 @app.route("/console/<console>")
