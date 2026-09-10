@@ -1,0 +1,167 @@
+"""Suite de testes unitários para o Catálogo de Jogos (sem dependências externas)."""
+import os
+import tempfile
+import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from app import config, database, logos, metadata, models, scanner
+from app.metadata import is_safe_url
+
+
+class TestMetadata(unittest.TestCase):
+    def test_clean_title(self):
+        cases = [
+            ("Super_Mario_Odyssey (USA) [En].nsp", "Super Mario Odyssey"),
+            ("The_Legend_of_Zelda_-_Breath_of_the_Wild_(Rev 1).xci", "The Legend of Zelda - Breath of the Wild"),
+            ("Metal_Gear_Solid_[v1.1].iso", "Metal Gear Solid"),
+            ("Halo_3.zip", "Halo 3"),
+            ("SimpleGame.bin", "SimpleGame"),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(metadata.clean_title(raw), expected)
+
+
+class TestScannerFilters(unittest.TestCase):
+    def test_cue_bin_deduplication(self):
+        def make_entry(name, is_dir=False):
+            return SimpleNamespace(
+                name=name,
+                is_dir=lambda: is_dir,
+                is_file=lambda: not is_dir,
+                path=f"/fake/{name}",
+            )
+
+        entries = [
+            make_entry("Crash Bandicoot.cue"),
+            make_entry("Crash Bandicoot.bin"),
+            make_entry("Crash Bandicoot (Track 1).bin"),
+            make_entry("Crash Bandicoot (Track 2).bin"),
+            make_entry("Tekken 3.iso"),
+            make_entry("Standalone.bin"),
+            make_entry(".DS_Store"),
+            make_entry("Halo 3", is_dir=True),
+        ]
+
+        filtered = scanner.filter_game_entries(entries)
+        names = [e.name for e in filtered]
+
+        self.assertIn("Crash Bandicoot.cue", names)
+        self.assertIn("Tekken 3.iso", names)
+        self.assertIn("Standalone.bin", names)
+        self.assertIn("Halo 3", names)
+
+        # Ficheiros redundantes devem ser removidos
+        self.assertNotIn("Crash Bandicoot.bin", names)
+        self.assertNotIn("Crash Bandicoot (Track 1).bin", names)
+        self.assertNotIn("Crash Bandicoot (Track 2).bin", names)
+        self.assertNotIn(".DS_Store", names)
+
+
+class TestLogos(unittest.TestCase):
+    def test_safe_name(self):
+        self.assertEqual(logos.safe_name("Nintendo Switch"), "Nintendo Switch")
+        self.assertEqual(logos.safe_name("PlayStation 2 / Pro"), "PlayStation 2 _ Pro")
+
+    def test_initials_for(self):
+        self.assertEqual(logos.initials_for("PlayStation 2"), "P2")
+        self.assertEqual(logos.initials_for("Switch"), "SW")
+        self.assertEqual(logos.initials_for(""), "?")
+
+    def test_accent_for_deterministic(self):
+        accent1 = logos.accent_for("Xbox 360")
+        accent2 = logos.accent_for("Xbox 360")
+        self.assertEqual(accent1, accent2)
+        self.assertTrue(accent1.startswith("hsl("))
+
+
+class TestSecurity(unittest.TestCase):
+    def test_is_safe_url(self):
+        unsafe_urls = [
+            "http://localhost:8080/image.jpg",
+            "http://127.0.0.1:5000/test.png",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[::1]/test.jpg",
+            "ftp://example.com/image.png",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "http://myrouter.local/cover.jpg",
+            "http://192.168.1.1/secret.png",
+            "http://10.0.0.5/thumb.jpg",
+        ]
+        for u in unsafe_urls:
+            with self.subTest(url=u):
+                self.assertFalse(is_safe_url(u))
+
+        safe_urls = [
+            "https://images.igdb.com/igdb/image/upload/t_cover_big/co1r7f.png",
+            "http://cdn.steamgriddb.com/grid/test.jpg",
+            "https://example.com/cover.png",
+        ]
+        for u in safe_urls:
+            with self.subTest(url=u):
+                self.assertTrue(is_safe_url(u))
+
+
+class TestDatabaseOperations(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp_dir.name, "test_catalog.db")
+        self.patcher_db = patch.object(config, "DB_PATH", self.db_path)
+        self.patcher_dir = patch.object(config, "DATA_DIR", self.temp_dir.name)
+        self.patcher_thumbs = patch.object(config, "THUMBS_DIR", os.path.join(self.temp_dir.name, "thumbs"))
+        self.patcher_logos = patch.object(config, "LOGOS_DIR", os.path.join(self.temp_dir.name, "logos"))
+        self.patcher_db.start()
+        self.patcher_dir.start()
+        self.patcher_thumbs.start()
+        self.patcher_logos.start()
+        database.init_db()
+
+    def tearDown(self):
+        self.patcher_db.stop()
+        self.patcher_dir.stop()
+        self.patcher_thumbs.stop()
+        self.patcher_logos.stop()
+        self.temp_dir.cleanup()
+
+    def test_crud_games(self):
+        # Inserir um jogo
+        with database.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO games (id, title, console, path, size_bytes) VALUES (?,?,?,?,?)",
+                ("id123", "Super Mario Odyssey", "Nintendo Switch", "/games/switch/smo.nsp", 5000000),
+            )
+
+        # Listar consolas
+        consoles = models.list_consoles()
+        self.assertEqual(len(consoles), 1)
+        self.assertEqual(consoles[0]["console"], "Nintendo Switch")
+        self.assertEqual(consoles[0]["total"], 1)
+
+        # Obter jogo
+        g = models.get_game("id123")
+        self.assertIsNotNone(g)
+        self.assertEqual(g["title"], "Super Mario Odyssey")
+
+        # Atualizar jogo
+        models.update_game("id123", {"genre": "Platformer", "year": 2017})
+        g_updated = models.get_game("id123")
+        self.assertEqual(g_updated["genre"], "Platformer")
+        self.assertEqual(g_updated["year"], 2017)
+
+        # Pesquisar jogo globalmente
+        results = models.list_games(console=None, search="Mario")
+        self.assertEqual(len(results), 1)
+
+        results_empty = models.list_games(console=None, search="Zelda")
+        self.assertEqual(len(results_empty), 0)
+
+        # Eliminar jogo
+        deleted = models.delete_game("id123")
+        self.assertTrue(deleted)
+        self.assertIsNone(models.get_game("id123"))
+
+
+if __name__ == "__main__":
+    unittest.main()

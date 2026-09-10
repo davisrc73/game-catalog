@@ -13,8 +13,8 @@
     <a class="brand" href="{{ url_for('index') }}">
       <span class="brand-mark">▚</span> Catálogo<span class="brand-dim">/NAS</span>
     </a>
-    <form class="search" action="{{ url_for('console_view', console=request.view_args.get('console','')) if request.view_args and request.view_args.get('console') else '#' }}" method="get" onsubmit="return doSearch(event)">
-      <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo…" value="{{ request.args.get('q','') }}">
+    <form class="search" action="{{ url_for('console_view', console=request.view_args.get('console','')) if request.view_args and request.view_args.get('console') else url_for('search_view') }}" method="get" onsubmit="return doSearch(event)">
+      <input id="globalSearch" type="search" name="q" placeholder="Pesquisar jogo…" aria-label="Pesquisar jogos" value="{{ request.args.get('q','') }}">
     </form>
     <button id="scanBtn" class="btn-scan" onclick="startScan()">
       <span class="dot"></span> Fazer scan

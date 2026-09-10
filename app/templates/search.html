@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{% if query %}Pesquisa: {{ query }}{% else %}Pesquisa Global{% endif %} · Catálogo{% endblock %}
+{% block content %}
+
+<nav class="crumbs">
+  <a href="{{ url_for('index') }}">Catálogo</a> / <span>Pesquisa</span>
+</nav>
+
+<div class="page-head">
+  <h1>Resultados da pesquisa</h1>
+  <span class="muted">{{ games|length }} jogo{{ 's' if games|length != 1 else '' }}{% if query %} para “{{ query }}”{% endif %}</span>
+</div>
+
+{% if games %}
+<div class="game-grid">
+  {% for g in games %}
+  <a class="game-card" href="{{ url_for('game_view', game_id=g.id) }}">
+    <div class="cover">
+      {% if g.cover %}
+        <img loading="lazy" src="{{ url_for('cover', filename=g.cover) }}" alt="{{ g.title }}">
+      {% else %}
+        <div class="cover-placeholder"><span>{{ g.title[0]|upper }}</span></div>
+      {% endif %}
+    </div>
+    <div class="game-meta">
+      <span class="game-title">{{ g.title }}</span>
+      <span class="game-year">{{ g.console }}{% if g.year %} · {{ g.year }}{% endif %}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>Nenhum jogo encontrado{% if query %} para “{{ query }}”{% endif %}.</p>
+  <p class="muted">Tente procurar por palavras-chave diferentes ou verifique a ortografia.</p>
+</div>
+{% endif %}
+
+{% endblock %}

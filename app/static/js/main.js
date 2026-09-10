@@ -1,4 +1,4 @@
-// Pesquisa: redireciona para a consola atual ou pesquisa global na 1.ª consola.
+// Pesquisa: redireciona para a consola atual ou pesquisa global
 function doSearch(e){
   e.preventDefault();
   const q = document.getElementById('globalSearch').value.trim();
@@ -6,9 +6,9 @@ function doSearch(e){
   if (m){
     location.href = `/console/${m[1]}` + (q ? `?q=${encodeURIComponent(q)}` : '');
   } else if (q){
-    // fora de uma consola: vai para a página inicial filtrada não existe,
-    // por isso reencaminha para a primeira consola disponível, se houver.
-    location.href = `/?` ; // a pesquisa global por consola faz-se dentro da consola
+    location.href = `/search?q=${encodeURIComponent(q)}`;
+  } else {
+    location.href = `/search`;
   }
   return false;
 }

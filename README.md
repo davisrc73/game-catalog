@@ -2,13 +2,14 @@
 
 Web portal leve para gerir um catálogo de jogos guardados no NAS, organizado por
 consola, com scan automático das pastas, deteção de novos/removidos e procura de
-capas online. Pensado para correr com poucos recursos no **DS220+** (CPU ARM
-Realtek RTD1296, 2 GB de RAM).
+capas online. Pensado para correr com poucos recursos no **DS220+** (Intel Celeron x86_64, 2 GB de RAM)
+ou modelos ARM como o **DS220j** (Realtek RTD1296). A imagem Docker Python slim é
+multi-arquitetura e suporta ambos nativamente.
 
-- **Backend:** Python + Flask, servido por **waitress** (leve, sem fork — ideal para ARM)
+- **Backend:** Python + Flask, servido por **waitress** (leve, sem fork — ideal para sistemas com pouca RAM)
 - **Base de dados:** SQLite (modo WAL, sem servidor extra)
-- **Frontend:** HTML + CSS/JS próprio, **sem dependências externas** (funciona offline na LAN)
-- **Capas:** SteamGridDB · **Metadados:** IGDB (ambos opcionais), guardados localmente
+- **Frontend:** HTML + CSS/JS próprio, **sem dependências externas** (funciona offline na LAN) com pesquisa global
+- **Capas:** SteamGridDB · **Metadados:** IGDB (ambos opcionais), guardados localmente com validação de segurança anti-SSRF
 
 ---
 
@@ -18,20 +19,22 @@ Realtek RTD1296, 2 GB de RAM).
 game-catalog/
 ├── app/
 │   ├── __init__.py
-│   ├── app.py            # Aplicação Flask (rotas + API)
+│   ├── app.py            # Aplicação Flask (rotas + pesquisa global + API)
 │   ├── config.py         # Configuração via variáveis de ambiente
 │   ├── database.py       # SQLite (esquema + ligação)
 │   ├── models.py         # Acesso a dados (queries)
-│   ├── scanner.py        # Lógica de scan/sincronização com o NAS
-│   ├── metadata.py       # Capas (SteamGridDB) + metadados (IGDB) + limpeza de títulos
-│   ├── templates/        # index, console, game, edit, base
+│   ├── scanner.py        # Lógica de scan/sincronização com o NAS e filtro CUE/BIN
+│   ├── metadata.py       # Capas (SteamGridDB) + metadados (IGDB) + validação de URLs
+│   ├── templates/        # index, console, game, edit, search, base
 │   └── static/           # css/style.css, js/main.js
+├── tests/                # Suite de testes unitários com unittest nativo
 ├── scan.py               # Scan via linha de comandos (para o cron)
 ├── server.py             # Servidor de produção (waitress)
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
+├── MANUAL_SYNOLOGY.md    # Manual detalhado de deploy e operação no Synology
 └── README.md
 ```
 

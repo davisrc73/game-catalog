@@ -1,5 +1,7 @@
-"""Aplicação Flask do catálogo de jogos."""
+import ipaddress
 import os
+import urllib.parse
+import urllib.request
 
 from flask import (Flask, abort, jsonify, redirect, render_template, request,
                    send_from_directory, url_for)
@@ -38,6 +40,13 @@ def index():
         last_scan=models.last_scan(),
         scanning=scanner.is_scanning(),
     )
+
+
+@app.route("/search")
+def search_view():
+    query = request.args.get("q", "").strip()
+    games = models.list_games(console=None, search=query) if query else []
+    return render_template("search.html", query=query, games=games)
 
 
 @app.route("/console/<console>")
@@ -125,19 +134,42 @@ def console_logo_upload(console):
     return redirect(url_for("console_view", console=console))
 
 
-def _save_cover_from_url(game_id: str, url: str) -> None:
-    import urllib.request
+def _save_cover_from_url(game_id: str, url: str) -> bool:
+    """Descarrega capa de URL externo com streaming, limite de 5MB e proteção anti-SSRF."""
+    if not metadata.is_safe_url(url):
+        return False
+    max_size = 5 * 1024 * 1024  # 5 MB
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "GameCatalog/1.0"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = resp.read()
-        ext = os.path.splitext(url.split("?")[0])[1] or ".png"
-        filename = f"{game_id}{ext.lower()}"
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content_length = resp.headers.get("Content-Length")
+            if content_length and int(content_length) > max_size:
+                return False
+            chunks = []
+            total_size = 0
+            while True:
+                chunk = resp.read(64 * 1024)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_size:
+                    return False
+                chunks.append(chunk)
+            data = b"".join(chunks)
+
+        if not data:
+            return False
+
+        parsed = urllib.parse.urlparse(url)
+        raw_ext = os.path.splitext(parsed.path)[1].lower()
+        ext = raw_ext if raw_ext in (".png", ".jpg", ".jpeg", ".webp") else ".jpg"
+        filename = f"{game_id}{ext}"
         with open(os.path.join(config.THUMBS_DIR, filename), "wb") as f:
             f.write(data)
         models.update_game(game_id, {"cover": filename, "cover_locked": 1})
+        return True
     except Exception:
-        pass
+        return False
 
 
 # ----------------------------------------------------------------------------

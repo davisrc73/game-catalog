@@ -67,6 +67,32 @@ def _is_game_entry(entry: os.DirEntry) -> bool:
     return ext in config.GAME_EXTENSIONS
 
 
+def filter_game_entries(entries: list[os.DirEntry]) -> list[os.DirEntry]:
+    """Filtra itens válidos e remove ficheiros .bin redundantes se houver .cue correspondente.
+
+    Exemplo: se existir 'Game.cue', ficheiros como 'Game.bin', 'Game (Track 1).bin',
+    'Game (Track 2).bin' são ignorados para não poluir o catálogo com jogos duplicados.
+    """
+    valid = [e for e in entries if _is_game_entry(e)]
+    cue_bases = {
+        os.path.splitext(e.name.lower())[0]
+        for e in valid
+        if not e.is_dir() and e.name.lower().endswith(".cue")
+    }
+    if not cue_bases:
+        return valid
+
+    filtered = []
+    for e in valid:
+        if not e.is_dir() and e.name.lower().endswith(".bin"):
+            bin_base = os.path.splitext(e.name.lower())[0]
+            # Se o .bin pertencer a qualquer .cue na mesma pasta, ignorar
+            if any(bin_base == cb or bin_base.startswith(cb) for cb in cue_bases):
+                continue
+        filtered.append(e)
+    return filtered
+
+
 def _entry_size(entry: os.DirEntry) -> int:
     try:
         if entry.is_file():
@@ -112,14 +138,12 @@ def scan(fetch_covers: bool = True, log=print) -> dict:
             for console, cpath in sources:
                 log(f"A analisar consola: {console}  ({cpath})")
                 try:
-                    entries = list(os.scandir(cpath))
+                    raw_entries = list(os.scandir(cpath))
                 except OSError as e:
                     log(f"  erro a ler {console}: {e}")
                     continue
 
-                for entry in entries:
-                    if not _is_game_entry(entry):
-                        continue
+                for entry in filter_game_entries(raw_entries):
                     # ID estável por (consola + nome do item): independente do
                     # volume físico, por isso sobreviver a mudanças de volumeUSBx.
                     gid = _game_id(console, entry.name)

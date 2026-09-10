@@ -5,6 +5,7 @@
 
 Tudo é opcional: sem credenciais, as funções não fazem nada e o scan continua.
 """
+import ipaddress
 import json
 import os
 import re
@@ -21,6 +22,28 @@ _TAG_RE = re.compile(r"[\(\[][^\)\]]*[\)\]]")          # (USA), [!], (Rev 1)...
 _SEP_RE = re.compile(r"[._]+")                          # pontos/underscores -> espaço
 _MULTISPACE_RE = re.compile(r"\s{2,}")
 _USER_AGENT = "GameCatalog/1.0 (+https://localhost)"
+
+
+def is_safe_url(url: str) -> bool:
+    """Valida se o URL é seguro para download (esquema HTTP/HTTPS e anti-SSRF)."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme.lower() not in ("http", "https"):
+            return False
+        host = (parsed.hostname or "").lower().strip()
+        if not host:
+            return False
+        if host in ("localhost", "127.0.0.1", "::1", "169.254.169.254") or host.endswith(".local") or host.endswith(".internal"):
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        except ValueError:
+            pass
+        return True
+    except Exception:
+        return False
 
 
 def clean_title(filename: str) -> str:
