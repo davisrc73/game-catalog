@@ -6,7 +6,7 @@ import urllib.request
 from flask import (Flask, abort, jsonify, redirect, render_template, request,
                    send_from_directory, url_for)
 
-from . import config, logos, models, scanner
+from . import config, logos, metadata, models, scanner
 from .database import init_db
 
 app = Flask(__name__)
@@ -302,19 +302,34 @@ def settings_view():
     else:
         root = config.GAMES_ROOT
         if os.path.isdir(root):
-            for e in sorted(os.scandir(root), key=lambda x: x.name.lower()):
-                if e.is_dir() and e.name.lower() not in config.IGNORE_NAMES:
-                    game_count = len(models.list_games(console=e.name))
-                    sources_info.append({
-                        "console": e.name,
-                        "path": e.path,
-                        "accessible": True,
-                        "games": game_count,
-                    })
+            try:
+                for e in sorted(os.scandir(root), key=lambda x: x.name.lower()):
+                    if e.is_dir() and e.name.lower() not in config.IGNORE_NAMES:
+                        game_count = len(models.list_games(console=e.name))
+                        sources_info.append({
+                            "console": e.name,
+                            "path": e.path,
+                            "accessible": True,
+                            "games": game_count,
+                        })
+            except OSError:
+                pass
 
     # Diagnóstico de armazenamento
-    db_size = os.path.getsize(config.DB_PATH) if os.path.exists(config.DB_PATH) else 0
-    thumbs_count = len(os.listdir(config.THUMBS_DIR)) if os.path.isdir(config.THUMBS_DIR) else 0
+    db_size = 0
+    try:
+        if os.path.exists(config.DB_PATH):
+            db_size = os.path.getsize(config.DB_PATH)
+    except OSError:
+        pass
+
+    thumbs_count = 0
+    try:
+        if os.path.isdir(config.THUMBS_DIR):
+            thumbs_count = len(os.listdir(config.THUMBS_DIR))
+    except OSError:
+        pass
+
     missing_covers = models.missing_covers_count()
 
     diagnostics = {

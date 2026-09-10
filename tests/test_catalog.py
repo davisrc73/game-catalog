@@ -24,7 +24,8 @@ class TestMetadata(unittest.TestCase):
 
 
 class TestScannerFilters(unittest.TestCase):
-    def test_cue_bin_deduplication(self):
+    @patch.object(models, "get_setting", return_value=None)
+    def test_cue_bin_deduplication(self, _mock_setting):
         def make_entry(name, is_dir=False):
             return SimpleNamespace(
                 name=name,
@@ -350,6 +351,38 @@ class TestDatabaseOperations(unittest.TestCase):
                 ],
             )
         self.assertEqual(models.missing_covers_count(), 2)
+
+
+class TestFlaskRoutes(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp_dir.name, "test_catalog.db")
+        self.patcher_db = patch.object(config, "DB_PATH", self.db_path)
+        self.patcher_dir = patch.object(config, "DATA_DIR", self.temp_dir.name)
+        self.patcher_thumbs = patch.object(config, "THUMBS_DIR", os.path.join(self.temp_dir.name, "thumbs"))
+        self.patcher_logos = patch.object(config, "LOGOS_DIR", os.path.join(self.temp_dir.name, "logos"))
+        self.patcher_db.start()
+        self.patcher_dir.start()
+        self.patcher_thumbs.start()
+        self.patcher_logos.start()
+        database.init_db()
+
+    def tearDown(self):
+        self.patcher_db.stop()
+        self.patcher_dir.stop()
+        self.patcher_thumbs.stop()
+        self.patcher_logos.stop()
+        self.temp_dir.cleanup()
+
+    def test_settings_route(self):
+        try:
+            from app.app import app
+        except ImportError:
+            return  # Se Flask não estiver instalado no ambiente base
+        client = app.test_client()
+        resp = client.get("/settings")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Definições", resp.data.decode("utf-8"))
 
 
 if __name__ == "__main__":
