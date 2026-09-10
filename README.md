@@ -1,6 +1,6 @@
-# 🎮 Catálogo de Jogos para Synology NAS
+# 🎮 Catálogo de Jogos para Synology NAS `v1.0.0`
 
-Web portal leve para gerir um catálogo de jogos guardados no NAS, organizado por
+Web portal leve e autónomo para gerir um catálogo de jogos guardados no NAS, organizado por
 consola, com scan automático das pastas, deteção de novos/removidos e procura de
 capas online. Pensado para correr com poucos recursos no **DS220+** (Intel Celeron x86_64, 2 GB de RAM)
 ou modelos ARM como o **DS220j** (Realtek RTD1296). A imagem Docker Python slim é
@@ -8,8 +8,13 @@ multi-arquitetura e suporta ambos nativamente.
 
 - **Backend:** Python + Flask, servido por **waitress** (leve, sem fork — ideal para sistemas com pouca RAM)
 - **Base de dados:** SQLite (modo WAL, sem servidor extra)
-- **Frontend:** HTML + CSS/JS próprio, **sem dependências externas** (funciona offline na LAN) com pesquisa global
-- **Capas:** SteamGridDB · **Metadados:** IGDB (ambos opcionais), guardados localmente com validação de segurança anti-SSRF
+- **Frontend:** HTML + CSS/JS próprio, **sem dependências externas** (funciona offline na LAN) com design arcade escuro
+- **Pesquisa Global:** Instantânea ao digitar com *dropdown* em tempo real e fallback nativo HTML
+- **Sistema de Favoritos ⭐:** Marcação rápida em cards e detalhe, filtros por consola e biblioteca
+- **Sorteio Aleatório 🎲:** Escolha de jogos ao acaso (geral, por consola ou entre favoritos)
+- **Capas:** Upload direto de ficheiros locais ou download automático via SteamGridDB
+- **Metadados:** IGDB (ano, género, sinopse) com validação de segurança anti-SSRF
+- **Área de Definições ⚙️:** Painel web para gerir chaves de API, testar ligações em tempo real e monitorizar volumes montados
 
 ---
 
